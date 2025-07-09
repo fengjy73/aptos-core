@@ -7,12 +7,13 @@ use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
+use aptos_transaction_benchmarks::simulator::Simulator;
+
 use aptos_vm_logging::disable_speculative_logging;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
 use std::{
-    net::SocketAddr,
-    time::{SystemTime, UNIX_EPOCH},
+    error::Error, fs, io::Write, net::SocketAddr, path::Path, time::{SystemTime, UNIX_EPOCH}
 };
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
@@ -30,11 +31,82 @@ struct Args {
 enum BenchmarkCommand {
     ParamSweep(ParamSweepOpt),
     Execute(ExecuteOpt),
+    ReplayERC20(ReplayERC20HistoricOpt),
+    Airdrop(CommonOpt),
+    Ballot(CommonOpt),
+    BallotSharding(CommonShardingOpt),
+    Kitty(CommonOpt),
+    MillionPixel(CommonOpt),
+    Empty(CommonOpt),
 }
 
 #[derive(Debug, Parser)]
+struct ReplayERC20HistoricOpt{
+    #[clap(long)]
+    pub skip_parallel: bool,
+
+    #[clap(long)]
+    pub skip_sequential: bool,
+
+    #[clap(long, default_value_t = 0)]
+    pub num_warmups: usize,
+
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long)]
+    pub maybe_block_gas_limit: Option<u64>,
+
+    #[clap(long, default_value="../data/USDT_240101_240331_data_100000.csv")]
+    pub data_path:String,
+
+    #[clap(long,default_value_t=93000)]
+    pub num_accounts:usize,
+
+    #[clap(long)]
+    pub output_file: Option<String>,
+
+    #[clap(long)]
+    pub concurrency_level: Option<usize>,
+}
+
+#[derive(Debug, Parser)]
+struct CommonOpt{
+    #[clap(long, default_value_t = 0)]
+    pub num_warmups: usize,
+    
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long,default_value_t = 1000)]
+    pub num_accounts: usize,
+
+    #[clap(long,default_value_t = 100000)]
+    pub num_transactions: usize,
+}
+
+#[derive(Debug, Parser)]
+struct CommonShardingOpt{
+    #[clap(long, default_value_t = 0)]
+    pub num_warmups: usize,
+    
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long,default_value_t = 1000)]
+    pub num_accounts: usize,
+
+    #[clap(long,default_value_t = 100000)]
+    pub num_transactions: usize,
+
+    #[clap(long,default_value_t = 1)]
+    pub num_shardings: usize,
+}
+
+
+#[derive(Debug, Parser)]
 struct ParamSweepOpt {
-    #[clap(long, default_value = "200000")]
+    #[clap(long, default_value = "1000")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
@@ -46,10 +118,10 @@ struct ParamSweepOpt {
     #[clap(long)]
     pub skip_sequential: bool,
 
-    #[clap(long, default_value_t = 2)]
+    #[clap(long, default_value_t = 0)]
     pub num_warmups: usize,
 
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
     #[clap(long)]
@@ -58,13 +130,13 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value_t = 100000)]
+    #[clap(long, default_value_t = 1000)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value_t = 5)]
+    #[clap(long, default_value_t = 0)]
     pub num_warmups: usize,
 
-    #[clap(long, default_value_t = 10000)]
+    #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
 
     #[clap(long, default_value_t = 15)]
@@ -87,6 +159,36 @@ struct ExecuteOpt {
 
     #[clap(long, default_value_t = false)]
     pub generate_then_execute: bool,
+}
+
+fn replay_erc20_historic(opt: ReplayERC20HistoricOpt) -> Result<(), Box<dyn Error>> {
+    // 如果指定了输出文件，确保目录存在
+    if let Some(ref output_path) = opt.output_file {
+        if let Some(parent_dir) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent_dir)?;
+        }
+    }
+
+    let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+    let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
+    let result = simulator.replay_erc20_historic(
+        opt.data_path,
+        opt.skip_parallel,
+        opt.skip_sequential,
+        opt.num_warmups,
+        opt.num_runs,
+        opt.maybe_block_gas_limit,
+        concurrency_level,
+    );
+
+    // 如果指定了输出文件，将结果写入文件
+    if let Some(output_path) = opt.output_file {
+        let mut file = fs::File::create(&output_path)?;
+        writeln!(file, "Replay ERC20 Historic benchmark completed successfully")?;
+        println!("Results written to: {}", output_path);
+    }
+
+    result
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -211,6 +313,35 @@ fn main() {
     match args.command {
         BenchmarkCommand::ParamSweep(opt) => param_sweep(opt),
         BenchmarkCommand::Execute(opt) => execute(opt),
+        BenchmarkCommand::ReplayERC20(opt) => {
+            if let Err(e) = replay_erc20_historic(opt) {
+                eprintln!("Error in replay_erc20_historic: {}", e);
+            }
+        },
+        BenchmarkCommand::Airdrop(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_airdrop(opt.num_transactions);
+        },
+        BenchmarkCommand::Ballot(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_ballot(opt.num_transactions);
+        },
+        BenchmarkCommand::BallotSharding(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_ballot_sharding(opt.num_transactions, opt.num_shardings);
+        },
+        BenchmarkCommand::Kitty(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_kitty(opt.num_transactions);
+        },
+        BenchmarkCommand::MillionPixel(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_mp(opt.num_transactions);
+        },
+        BenchmarkCommand::Empty(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_empty(opt.num_transactions);
+        },
     }
 }
 

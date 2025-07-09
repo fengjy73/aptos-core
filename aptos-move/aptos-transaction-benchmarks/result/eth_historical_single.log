@@ -1,0 +1,26 @@
+run eth historical transfer tasks (single core)
+============================== running with single cpu core ==============================
+2025-07-09T08:55:16.245139Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-09T08:55:16.245430Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-09T08:55:16.245511Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752050716245&to=1752051316245&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752051316245340000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./data/ETH_2404_100000.csv
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-09T08:55:25.639315Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+2025-07-09T08:55:32.024713Z [par_exec-6] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[16] execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798404,"elapsed_ms":6362,"num_committed":100000,"num_total":100000,"num_workers":16,"raw_block_gas":798404}
+execution_total:171471, validation_total:578956, abort:71471, suspend:20979, avg_suspend_time:1453.27 us, suspend_time_total:30488153.70 us
+Parallel execution finishes, TPS = 15532
+Sequential execution starts...
+2025-07-09T08:55:32.144457Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+2025-07-09T08:56:01.787972Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798404,"elapsed_ms":29615,"num_committed":100000,"num_total":100000,"num_workers":1,"raw_block_gas":798404}
+execution_total:171471, validation_total:578956, abort:71471, suspend:20979, avg_suspend_time:1453.27 us, suspend_time_total:30488153.70 us
+Sequential execution finishes, TPS = 3342
+Parallel execution finishes, TPS = 15532
+Sequential execution finishes, TPS = 3342
+
+
+============================== finalize ==============================
+parallel execution tps: [15532,15532]
+sequential execution tps: [3342,3342]

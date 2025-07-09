@@ -1481,6 +1481,13 @@ where
             return Ok(BlockOutput::new(vec![], None));
         }
 
+        // Record counter values before execution for delta calculation
+        let execution_before = counters::TASK_EXECUTE_SECONDS.get_sample_count();
+        let validation_before = counters::TASK_VALIDATE_SECONDS.get_sample_count();
+        let abort_before = counters::SPECULATIVE_ABORT_COUNT.get();
+        let suspend_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count();
+        let suspend_time_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum();
+
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
@@ -1559,6 +1566,23 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
+        
+        // Calculate deltas for this execution
+        let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
+        let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
+        let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
+        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - suspend_time_before;
+        let avg_suspend_time = if suspend > 0 { suspend_time_total / suspend as f64 } else { 0.0 };
+        
+        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+            execution_total,
+            validation_total,
+            abort,
+            suspend,
+            avg_suspend_time * 1000000.0,
+            suspend_time_total * 1000000.0
+        );
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(versioned_cache.take_modules_iter())
@@ -1812,6 +1836,13 @@ where
             return Ok(BlockOutput::new(vec![], None));
         }
 
+        // Record counter values before execution for delta calculation
+        let execution_before = counters::TASK_EXECUTE_SECONDS.get_sample_count();
+        let validation_before = counters::TASK_VALIDATE_SECONDS.get_sample_count();
+        let abort_before = counters::SPECULATIVE_ABORT_COUNT.get();
+        let suspend_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count();
+        let suspend_time_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum();
+
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
         let executor = E::init(environment, base_view);
@@ -1848,7 +1879,10 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res = {
+                let _timer = TASK_EXECUTE_SECONDS.start_timer();
+                executor.execute_transaction(&latest_view, txn, idx as TxnIndex)
+            };
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
@@ -2135,6 +2169,27 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         counters::update_state_counters(unsync_map.stats(), false);
+        
+        // Calculate deltas for this execution
+        let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
+        let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
+        let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
+        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - suspend_time_before;
+        let avg_suspend_time = if suspend > 0 {
+            suspend_time_total / suspend as f64
+        } else {
+            0.0
+        };
+        
+        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+            execution_total,
+            validation_total,
+            abort,
+            suspend,
+            avg_suspend_time * 1000000.0,
+            suspend_time_total * 1000000.0
+        );
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;

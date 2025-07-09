@@ -7,6 +7,7 @@
 use crate::account::Account;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_types::transaction::{Script, SignedTransaction};
+use move_core_types::account_address::AccountAddress;
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
@@ -73,6 +74,177 @@ pub fn peer_to_peer_txn(
             transfer_amount,
         ))
         .sequence_number(seq_num)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call airdrop initialize
+pub fn airdrop_initialize_txn(
+    sender:&Account,
+    amount:u64,
+    seq_num: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_airdrop_initialize(amount))
+        .sequence_number(seq_num)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+// call airdrop transfer_n
+pub fn airdrop_transfer_txn(
+    sender:&Account,
+    receiver:Vec<AccountAddress>,
+    seq_num: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_airdrop_transfer_n(receiver))
+        .sequence_number(seq_num)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call ballot initialize
+pub fn ballot_initialize_txn(
+    sender:&Account,
+    names: Vec<Vec<u8>>,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_ballot_initialize(names))
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call ballot vote
+pub fn ballot_vote_txn(
+    sender: &Account,
+    forum: &AccountAddress,
+    proposal_index: u64,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_ballot_vote(
+            *forum, 
+            proposal_index
+        ))
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call million_pixel initialize
+pub fn million_pixel_initialize_txn(
+    sender:&Account,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_million_pixel_initialize())
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call million_pixel occupy
+pub fn million_pixel_occupy_txn(
+    sender:&Account,
+    globalstore:&AccountAddress,
+    x:u16,
+    y:u16,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_million_pixel_occupy(
+            *globalstore,
+            x,
+            y
+        ))
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call kitty initialize
+pub fn kitty_initialize_txn(
+    sender:&Account,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_kitty_breeding_initialize())
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call kitty mint
+pub fn kitty_mint_txn(
+    sender:&Account,
+    globalstore:&AccountAddress,
+    genes:u64,
+    gender:bool,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_kitty_breeding_mint(
+            *globalstore,
+            genes,
+            gender
+        ))
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call kitty breed
+pub fn kitty_breed_txn(
+    sender:&Account,
+    globalstore:&AccountAddress,
+    m:u64,
+    s:u64,
+    gender:bool,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_kitty_breeding_breed(
+            *globalstore,
+            m,
+            s,
+            gender
+        ))
+        .sequence_number(sequence_number)
+        .gas_unit_price(gas_unit_price)
+        .sign()
+}
+
+//call emtpy
+pub fn empty_empty_txn(
+    sender:&Account,
+    sequence_number: u64,
+    gas_unit_price: u64,
+) ->SignedTransaction{
+    sender
+        .transaction()
+        .payload(aptos_stdlib::xtl_empty_empty())
+        .sequence_number(sequence_number)
         .gas_unit_price(gas_unit_price)
         .sign()
 }

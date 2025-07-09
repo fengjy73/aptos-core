@@ -124,7 +124,7 @@ gas-profiling
 # replay-verify and module-verify script outputs
 metadata-cache
 /local/
-run_*
+# run_*
 
 # test files for indexer GRPC
 test_indexer_grpc_*.yaml

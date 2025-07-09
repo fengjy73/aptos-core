@@ -4427,8 +4427,12 @@ dependencies = [
  "clap 4.5.21",
  "criterion",
  "criterion-cpu-time",
+ "csv",
  "num_cpus",
+ "once_cell",
  "proptest",
+ "rand 0.7.3",
+ "rayon",
 ]
 
 [[package]]

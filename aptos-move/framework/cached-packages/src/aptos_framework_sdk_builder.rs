@@ -1254,6 +1254,48 @@ pub enum EntryFunctionCall {
     VestingVestMany {
         contract_addresses: Vec<AccountAddress>,
     },
+
+    XtlAirdropInitialize {
+        amount: u64,
+    },
+
+    XtlAirdropTransferN {
+        recipients: Vec<AccountAddress>,
+    },
+
+    XtlBallotInitialize {
+        names: Vec<Vec<u8>>,
+    },
+
+    XtlBallotVote {
+        forum: AccountAddress,
+        proposal_index: u64,
+    },
+
+    XtlEmptyEmpty {},
+
+    XtlKittyBreedingBreed {
+        global: AccountAddress,
+        m: u64,
+        s: u64,
+        gender: bool,
+    },
+
+    XtlKittyBreedingInitialize {},
+
+    XtlKittyBreedingMint {
+        global: AccountAddress,
+        genes: u64,
+        gender: bool,
+    },
+
+    XtlMillionPixelInitialize {},
+
+    XtlMillionPixelOccupy {
+        global_land: AccountAddress,
+        x: u16,
+        y: u16,
+    },
 }
 
 impl EntryFunctionCall {
@@ -1969,6 +2011,30 @@ impl EntryFunctionCall {
             } => vesting_update_voter(contract_address, new_voter),
             VestingVest { contract_address } => vesting_vest(contract_address),
             VestingVestMany { contract_addresses } => vesting_vest_many(contract_addresses),
+            XtlAirdropInitialize { amount } => xtl_airdrop_initialize(amount),
+            XtlAirdropTransferN { recipients } => xtl_airdrop_transfer_n(recipients),
+            XtlBallotInitialize { names } => xtl_ballot_initialize(names),
+            XtlBallotVote {
+                forum,
+                proposal_index,
+            } => xtl_ballot_vote(forum, proposal_index),
+            XtlEmptyEmpty {} => xtl_empty_empty(),
+            XtlKittyBreedingBreed {
+                global,
+                m,
+                s,
+                gender,
+            } => xtl_kitty_breeding_breed(global, m, s, gender),
+            XtlKittyBreedingInitialize {} => xtl_kitty_breeding_initialize(),
+            XtlKittyBreedingMint {
+                global,
+                genes,
+                gender,
+            } => xtl_kitty_breeding_mint(global, genes, gender),
+            XtlMillionPixelInitialize {} => xtl_million_pixel_initialize(),
+            XtlMillionPixelOccupy { global_land, x, y } => {
+                xtl_million_pixel_occupy(global_land, x, y)
+            },
         }
     }
 
@@ -5507,6 +5573,181 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
         vec![bcs::to_bytes(&contract_addresses).unwrap()],
     ))
 }
+
+pub fn xtl_airdrop_initialize(amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_airdrop").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+pub fn xtl_airdrop_transfer_n(recipients: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_airdrop").to_owned(),
+        ),
+        ident_str!("transfer_n").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&recipients).unwrap()],
+    ))
+}
+
+pub fn xtl_ballot_initialize(names: Vec<Vec<u8>>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_ballot").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&names).unwrap()],
+    ))
+}
+
+pub fn xtl_ballot_vote(forum: AccountAddress, proposal_index: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_ballot").to_owned(),
+        ),
+        ident_str!("vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&forum).unwrap(),
+            bcs::to_bytes(&proposal_index).unwrap(),
+        ],
+    ))
+}
+
+pub fn xtl_empty_empty() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_empty").to_owned(),
+        ),
+        ident_str!("empty").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn xtl_kitty_breeding_breed(
+    global: AccountAddress,
+    m: u64,
+    s: u64,
+    gender: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_kitty_breeding").to_owned(),
+        ),
+        ident_str!("breed").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&global).unwrap(),
+            bcs::to_bytes(&m).unwrap(),
+            bcs::to_bytes(&s).unwrap(),
+            bcs::to_bytes(&gender).unwrap(),
+        ],
+    ))
+}
+
+pub fn xtl_kitty_breeding_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_kitty_breeding").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn xtl_kitty_breeding_mint(
+    global: AccountAddress,
+    genes: u64,
+    gender: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_kitty_breeding").to_owned(),
+        ),
+        ident_str!("mint").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&global).unwrap(),
+            bcs::to_bytes(&genes).unwrap(),
+            bcs::to_bytes(&gender).unwrap(),
+        ],
+    ))
+}
+
+pub fn xtl_million_pixel_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_million_pixel").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn xtl_million_pixel_occupy(global_land: AccountAddress, x: u16, y: u16) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("xtl_million_pixel").to_owned(),
+        ),
+        ident_str!("occupy").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&global_land).unwrap(),
+            bcs::to_bytes(&x).unwrap(),
+            bcs::to_bytes(&y).unwrap(),
+        ],
+    ))
+}
 mod decoder {
     use super::*;
     pub fn account_offer_rotation_capability(
@@ -7516,6 +7757,110 @@ mod decoder {
             None
         }
     }
+
+    pub fn xtl_airdrop_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlAirdropInitialize {
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_airdrop_transfer_n(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlAirdropTransferN {
+                recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_ballot_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlBallotInitialize {
+                names: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_ballot_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlBallotVote {
+                forum: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_index: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_empty_empty(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::XtlEmptyEmpty {})
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_kitty_breeding_breed(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlKittyBreedingBreed {
+                global: bcs::from_bytes(script.args().get(0)?).ok()?,
+                m: bcs::from_bytes(script.args().get(1)?).ok()?,
+                s: bcs::from_bytes(script.args().get(2)?).ok()?,
+                gender: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_kitty_breeding_initialize(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::XtlKittyBreedingInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_kitty_breeding_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlKittyBreedingMint {
+                global: bcs::from_bytes(script.args().get(0)?).ok()?,
+                genes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                gender: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_million_pixel_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::XtlMillionPixelInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn xtl_million_pixel_occupy(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::XtlMillionPixelOccupy {
+                global_land: bcs::from_bytes(script.args().get(0)?).ok()?,
+                x: bcs::from_bytes(script.args().get(1)?).ok()?,
+                y: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 type EntryFunctionDecoderMap = std::collections::HashMap<
@@ -8169,6 +8514,46 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_vest_many".to_string(),
             Box::new(decoder::vesting_vest_many),
+        );
+        map.insert(
+            "xtl_airdrop_initialize".to_string(),
+            Box::new(decoder::xtl_airdrop_initialize),
+        );
+        map.insert(
+            "xtl_airdrop_transfer_n".to_string(),
+            Box::new(decoder::xtl_airdrop_transfer_n),
+        );
+        map.insert(
+            "xtl_ballot_initialize".to_string(),
+            Box::new(decoder::xtl_ballot_initialize),
+        );
+        map.insert(
+            "xtl_ballot_vote".to_string(),
+            Box::new(decoder::xtl_ballot_vote),
+        );
+        map.insert(
+            "xtl_empty_empty".to_string(),
+            Box::new(decoder::xtl_empty_empty),
+        );
+        map.insert(
+            "xtl_kitty_breeding_breed".to_string(),
+            Box::new(decoder::xtl_kitty_breeding_breed),
+        );
+        map.insert(
+            "xtl_kitty_breeding_initialize".to_string(),
+            Box::new(decoder::xtl_kitty_breeding_initialize),
+        );
+        map.insert(
+            "xtl_kitty_breeding_mint".to_string(),
+            Box::new(decoder::xtl_kitty_breeding_mint),
+        );
+        map.insert(
+            "xtl_million_pixel_initialize".to_string(),
+            Box::new(decoder::xtl_million_pixel_initialize),
+        );
+        map.insert(
+            "xtl_million_pixel_occupy".to_string(),
+            Box::new(decoder::xtl_million_pixel_occupy),
         );
         map
     });

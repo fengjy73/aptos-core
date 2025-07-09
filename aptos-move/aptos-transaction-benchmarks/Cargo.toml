@@ -30,7 +30,14 @@ clap = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 criterion-cpu-time = { workspace = true }
 num_cpus = { workspace = true }
+once_cell = { workspace = true }
 proptest = { workspace = true }
+rayon = { workspace = true }
+csv = "1.1.0"
+rand = { workspace = true }
+
+[profile.release]
+debug = true
 
 [[bench]]
 name = "transaction_benches"

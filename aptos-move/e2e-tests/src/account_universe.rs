@@ -153,6 +153,10 @@ impl AccountCurrent {
         self.sequence_number
     }
 
+    pub fn increase_account_sequence_number(&mut self) {
+        self.sequence_number += 1;
+    }
+
     /// Returns the gas cost of a create-account transaction.
     pub fn create_account_gas_cost(&self) -> u64 {
         if self.event_counter_created {

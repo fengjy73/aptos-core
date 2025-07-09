@@ -83,6 +83,11 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)
+-  [`0x1::xtl_airdrop`](xtl_airdrop.md#0x1_xtl_airdrop)
+-  [`0x1::xtl_ballot`](xtl_ballot.md#0x1_xtl_ballot)
+-  [`0x1::xtl_empty`](xtl_empty.md#0x1_xtl_empty)
+-  [`0x1::xtl_kitty_breeding`](xtl_kitty.md#0x1_xtl_kitty_breeding)
+-  [`0x1::xtl_million_pixel`](xtl_million_pixel.md#0x1_xtl_million_pixel)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -8,3 +8,4 @@ mod benchmark_runner;
 pub mod measurement;
 pub mod transaction_bench_state;
 pub mod transactions;
+pub mod simulator;

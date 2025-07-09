@@ -161,6 +161,18 @@ impl AccountUniverse {
         &self.accounts
     }
 
+    pub fn accounts_mut(&mut self) -> &mut [AccountCurrent]{
+        &mut self.accounts
+    }
+
+    pub fn account(&self, index:usize) -> &AccountCurrent{
+        &self.accounts[index]
+    }
+
+    pub fn account_mut(&mut self, index:usize) -> &mut AccountCurrent{
+        &mut self.accounts[index]
+    }
+
     /// Adds an account to the universe so that future transactions can be made out of this account.
     ///
     /// This is ignored if the universe was configured to be in gas-cost-stability mode.
