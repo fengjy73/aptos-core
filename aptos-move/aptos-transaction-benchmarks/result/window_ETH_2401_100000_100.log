@@ -1,0 +1,119 @@
+run historical transfer tasks for ETH_2401_100000 with 100 transactions
+Original data file: ./data/ETH_2401_100000.csv
+Sampled data file: ./temp_data/ETH_2401_100000_100.csv
+Transaction count: 100
+
+============================== running with cpu cores: (0) count:        1, transactions: 100 ==============================
+2025-07-17T17:11:04.599840Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-17T17:11:04.600112Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-17T17:11:04.600220Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752771664600&to=1752772264600&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752772264599983000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-17T17:11:11.182715Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:11.274180Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":51,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 1098
+Sequential execution starts...
+2025-07-17T17:11:11.276398Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:11.387224Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":65,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 900
+
+
+============================== running with cpu cores: (0,1) count:        2, transactions: 100 ==============================
+2025-07-17T17:11:17.893454Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-17T17:11:17.893964Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-17T17:11:17.894073Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752771677893&to=1752772277893&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752772277893837000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-17T17:11:24.462021Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:24.522660Z [par_exec-1] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[2] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":26,"num_committed":100,"num_total":100,"num_workers":2,"raw_block_gas":800}
+execution_total:100, validation_total:200, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:200, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 1666
+Sequential execution starts...
+2025-07-17T17:11:24.528244Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:24.606996Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":46,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1265
+
+
+============================== running with cpu cores: (0,1,2,3) count:        4, transactions: 100 ==============================
+2025-07-17T17:11:30.491340Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-17T17:11:30.501073Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-17T17:11:30.505687Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752771690505&to=1752772290505&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752772290500941000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-17T17:11:37.079170Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:37.127062Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[4] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":14,"num_committed":100,"num_total":100,"num_workers":4,"raw_block_gas":800}
+execution_total:102, validation_total:205, abort:2, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:102, validation_total:205, abort:2, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 2083
+Sequential execution starts...
+2025-07-17T17:11:37.129594Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:37.206759Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":44,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1298
+
+
+============================== running with cpu cores: (0,1,2,3,4,5,6,7) count:        8, transactions: 100 ==============================
+2025-07-17T17:11:43.519163Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-17T17:11:43.519579Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-17T17:11:43.519725Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752771703519&to=1752772303519&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752772303519429000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-17T17:11:50.107996Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:50.151293Z [par_exec-10] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[8] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":9,"num_committed":100,"num_total":100,"num_workers":8,"raw_block_gas":800}
+execution_total:103, validation_total:210, abort:3, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:103, validation_total:210, abort:3, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 2325
+Sequential execution starts...
+2025-07-17T17:11:50.153791Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:11:50.230037Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":43,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1315
+
+
+============================== running with cpu cores: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15) count:       16, transactions: 100 ==============================
+2025-07-17T17:11:56.686484Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-17T17:11:56.686754Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-17T17:11:56.686867Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1752771716686&to=1752772316686&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1752772316686625000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-17T17:12:03.249783Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:12:03.294861Z [par_exec-6] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[16] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":11,"num_committed":100,"num_total":100,"num_workers":16,"raw_block_gas":800}
+execution_total:104, validation_total:223, abort:4, suspend:1, avg_suspend_time:992.62 us, suspend_time_total:992.62 us
+execution_total:104, validation_total:223, abort:4, suspend:1, avg_suspend_time:992.62 us, suspend_time_total:992.62 us
+Parallel execution finishes, TPS = 2222
+Sequential execution starts...
+2025-07-17T17:12:03.298735Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-17T17:12:03.376898Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":800,"elapsed_ms":45,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":800}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1282
+
+
+============================== finalize ==============================
+parallel execution tps: [1098,1666,2083,2325,2222]
+speed up: [1.00,1.51,1.89,2.11,2.02]
+sequential execution tps: [900,1265,1298,1315,1282]
