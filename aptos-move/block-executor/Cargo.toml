@@ -48,6 +48,9 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
@@ -62,6 +65,8 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
 test-case = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [features]
 testing = []
@@ -71,6 +76,10 @@ fuzzing = ["criterion", "proptest", "proptest-derive"]
 name = "scheduler_benches"
 harness = false
 required-features = ["fuzzing"]
+
+[[example]]
+name = "block_stm_logging_example"
+path = "examples/block_stm_logging_example.rs"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

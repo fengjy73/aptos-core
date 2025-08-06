@@ -722,6 +722,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "cfg-if",
+ "chrono",
  "claims",
  "concurrent-queue",
  "criterion",
@@ -741,6 +742,9 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
  "test-case",
 ]
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_stm_logger::get_global_logger,
     captured_reads::CapturedReads,
     code_cache_global::GlobalModuleCache,
     code_cache_global_manager::AptosModuleCacheManagerGuard,
@@ -181,6 +182,12 @@ where
         scheduler: &SchedulerV2,
     ) -> Result<(), PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
+        let start_time = std::time::Instant::now();
+
+        // Log transaction start
+        if let Some(logger) = get_global_logger() {
+            logger.log_transaction_start(idx_to_execute, incarnation);
+        }
 
         // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
         let txn = signature_verified_block.get_txn(idx_to_execute);
@@ -195,6 +202,15 @@ where
         );
         let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
+        // Create execution result string for logging before processing
+        let execution_result_str = match &execution_result {
+            ExecutionStatus::Success(_) => "Success",
+            ExecutionStatus::Abort(_) => "Abort",
+            ExecutionStatus::SkipRest(_) => "SkipRest",
+            ExecutionStatus::SpeculativeExecutionAbortError(_) => "SpeculativeAbort",
+            ExecutionStatus::DelayedFieldsCodeInvariantError(_) => "DelayedFieldsError",
+        }.to_string();
+
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
@@ -205,11 +221,30 @@ where
             )));
         }
 
-        let maybe_output =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+        // Process execution result and record immediately to avoid borrowing issues
+        let mut resource_write_set = Vec::new();
+        let maybe_output = match &execution_result {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                Some(output)
+            },
+            ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
+                // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
+                // from DeltaApplicationFailure.
+                read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                    MVDelayedFieldsError::DeltaApplicationFailure,
+                ));
+                None
+            },
+            ExecutionStatus::Abort(_err) => None,
+            ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
+                return Err(code_invariant_error(format!(
+                    "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
+                    idx_to_execute, msg
+                )));
+            },
+        };
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
-        let mut resource_write_set = Vec::new();
         if let Some(output) = maybe_output {
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
@@ -234,14 +269,93 @@ where
             )?;
         }
 
+        // Prepare logging data before recording execution_result
+        let (gas_used, write_set_size) = if let Some(output) = maybe_output {
+            (
+                output.fee_statement().gas_used(),
+                resource_write_set.len(),
+            )
+        } else {
+            (0, 0)
+        };
+
         last_input_output.record(
             idx_to_execute,
             read_set,
             execution_result,
-            resource_write_set,
+            resource_write_set.clone(),
             // TODO(BlockSTMv2): handle groups.
             vec![],
         );
+
+        // Log transaction finish and additional details
+        if let Some(logger) = get_global_logger() {
+            let duration = start_time.elapsed();
+            
+            let actual_read_set_size = last_input_output.read_set(idx_to_execute)
+                .map(|read_set| read_set.get_read_summary().len())
+                .unwrap_or(0);
+            
+            logger.log_transaction_finish(
+                idx_to_execute,
+                incarnation,
+                &execution_result_str,
+                duration,
+                gas_used,
+                actual_read_set_size,
+                write_set_size,
+            );
+            
+            // Log read/write set changes
+            if let Some(read_set_ref) = last_input_output.read_set(idx_to_execute) {
+                let read_summary = read_set_ref.get_read_summary();
+                let read_keys: Vec<String> = read_summary.iter()
+                    .take(10) // Limit to first 10 keys to avoid excessive logging
+                    .map(|k| format!("{:?}", k))
+                    .collect();
+                let write_keys: Vec<String> = resource_write_set.iter()
+                    .take(10) // Limit to first 10 keys
+                    .map(|(k, _, _)| format!("{:?}", k))
+                    .collect();
+                
+                logger.log_readwrite_set_change(
+                    idx_to_execute,
+                    incarnation,
+                    read_keys,
+                    write_keys,
+                    actual_read_set_size,
+                    write_set_size,
+                    0, // module_reads - not easily available here
+                    0, // module_writes - not easily available here
+                    0, // delayed_field_reads - could be extracted from read_set
+                    0, // delayed_field_writes - could be extracted from output
+                );
+            }
+            
+            // Log performance metrics
+            let mut additional_data = std::collections::HashMap::new();
+            additional_data.insert("execution_result".to_string(), execution_result_str.clone());
+            additional_data.insert("read_set_size".to_string(), actual_read_set_size.to_string());
+            additional_data.insert("write_set_size".to_string(), write_set_size.to_string());
+            
+            logger.log_performance_metric(
+                "transaction_execution_time_us",
+                duration.as_micros() as f64,
+                Some(idx_to_execute),
+                additional_data.clone(),
+            );
+            
+            if gas_used > 0 {
+                let mut gas_data = std::collections::HashMap::new();
+                gas_data.insert("execution_result".to_string(), execution_result_str);
+                logger.log_performance_metric(
+                    "gas_used",
+                    gas_used as f64,
+                    Some(idx_to_execute),
+                    gas_data,
+                );
+            }
+        }
 
         scheduler.finish_execution(abort_manager)?;
         Ok(())
@@ -1342,7 +1456,6 @@ where
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub(crate) fn execute_transactions_parallel_v2(
         &self,
         signature_verified_block: &TP,
@@ -1445,6 +1558,35 @@ where
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
+
+        // Generate summary log before cleanup
+        if let Some(logger) = get_global_logger() {
+            let num_txns = signature_verified_block.num_txns();
+            let concurrency_level = self.config.local.concurrency_level;
+            let execution_successful = !shared_maybe_error.load(Ordering::SeqCst);
+            
+            let mut summary_data = std::collections::HashMap::new();
+            summary_data.insert("total_transactions".to_string(), num_txns.to_string());
+            summary_data.insert("concurrency_level".to_string(), concurrency_level.to_string());
+            summary_data.insert("execution_mode".to_string(), "parallel_v2".to_string());
+            summary_data.insert("execution_successful".to_string(), execution_successful.to_string());
+            
+            // Add versioned cache statistics
+            let cache_stats = versioned_cache.stats();
+            summary_data.insert("num_resources".to_string(), cache_stats.num_resources.to_string());
+            summary_data.insert("num_resource_groups".to_string(), cache_stats.num_resource_groups.to_string());
+            summary_data.insert("num_delayed_fields".to_string(), cache_stats.num_delayed_fields.to_string());
+            summary_data.insert("num_modules".to_string(), cache_stats.num_modules.to_string());
+            summary_data.insert("base_resources_size".to_string(), cache_stats.base_resources_size.to_string());
+            summary_data.insert("base_delayed_fields_size".to_string(), cache_stats.base_delayed_fields_size.to_string());
+            
+            logger.log_performance_metric(
+                "block_execution_summary",
+                num_txns as f64,
+                None,
+                summary_data,
+            );
+        }
 
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -2207,10 +2349,9 @@ where
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
+            let parallel_result = self.execute_transactions_parallel_v2(
                 signature_verified_block,
                 base_view,
-                transaction_slice_metadata,
                 module_cache_manager_guard,
             );
 

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use aptos_vm::{VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
 use aptos_vm_logging::disable_speculative_logging;
+use aptos_block_executor::block_stm_logger::{init_global_logger, LoggingConfig};
 use aptos_language_e2e_tests::{
     account_universe::{AccountPickStyle, AccountUniverse, AccountUniverseGen}, 
     common_transactions::{
@@ -688,6 +689,25 @@ impl Simulator{
         use std::fs::File;
         use std::io::{BufRead, BufReader};
         disable_speculative_logging();
+        
+        // Initialize Block-STM logger from environment variables
+        let logging_config = LoggingConfig::default();
+        println!("Block-STM logging config: enabled={}, log_dir={:?}, log_level={:?}", 
+                 logging_config.enabled, logging_config.log_dir, logging_config.log_level);
+        
+        if logging_config.enabled {
+            match init_global_logger(logging_config) {
+                Ok(()) => {
+                    println!("Block-STM logging initialized successfully");
+                },
+                Err(e) => {
+                    eprintln!("Failed to initialize Block-STM logger: {}", e);
+                    eprintln!("Continuing without logging...");
+                }
+            }
+        } else {
+            println!("Block-STM logging disabled (BLOCK_STM_LOG_LEVEL not set or invalid)");
+        }
         
         println!("Reading ERC20 historic data from: {}", data_path);
         

@@ -4,7 +4,12 @@
 // TODO(BlockSTMv2): enable dead code lint.
 #![allow(dead_code)]
 
-use crate::{counters, scheduler::ArmedLock, scheduler_status::ExecutionStatuses};
+use crate::{
+    block_stm_logger::get_global_logger,
+    counters, 
+    scheduler::ArmedLock, 
+    scheduler_status::ExecutionStatuses
+};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
@@ -852,10 +857,32 @@ impl SchedulerV2 {
         }
 
         let mut stall_propagation_queue: BTreeSet<usize> = BTreeSet::new();
-        for (txn_idx, maybe_incarnation) in invalidated_set {
+        
+        // Collect all dependencies for logging
+        let all_dependencies: Vec<TxnIndex> = invalidated_set.keys().copied().collect();
+        
+        for (dep_txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
-                self.txn_statuses.finish_abort(txn_idx, incarnation, true)?;
-                stall_propagation_queue.insert(txn_idx as usize);
+                // Log transaction abort with all dependency information
+                if let Some(logger) = get_global_logger() {
+                    let retry_count = self.txn_statuses.incarnation(dep_txn_idx);
+                    // Include all transactions that were invalidated in this batch
+                    let mut dependencies = all_dependencies.clone();
+                    // Also include the transaction that caused this invalidation
+                    if !dependencies.contains(&txn_idx) {
+                        dependencies.push(txn_idx);
+                    }
+                    logger.log_transaction_abort(
+                        dep_txn_idx,
+                        incarnation,
+                        "Dependency invalidation",
+                        retry_count,
+                        dependencies,
+                    );
+                }
+                
+                self.txn_statuses.finish_abort(dep_txn_idx, incarnation, true)?;
+                stall_propagation_queue.insert(dep_txn_idx as usize);
             }
         }
 
@@ -1047,6 +1074,8 @@ impl SchedulerV2 {
 
         Ok(ret)
     }
+
+
 
     /// Initiates the execution of a transaction via `ExecutionStatuses`.
     ///
