@@ -184,9 +184,17 @@ where
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let start_time = std::time::Instant::now();
 
-        // Log transaction start
+        // Log transaction start and execution state transition
         if let Some(logger) = get_global_logger() {
             logger.log_transaction_start(idx_to_execute, incarnation);
+            logger.log_execution_state_transition(
+                idx_to_execute,
+                incarnation,
+                "Scheduled",
+                "Executing",
+                "Task dispatched to worker",
+                "Execute",
+            );
         }
 
         // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
@@ -295,6 +303,16 @@ where
             let actual_read_set_size = last_input_output.read_set(idx_to_execute)
                 .map(|read_set| read_set.get_read_summary().len())
                 .unwrap_or(0);
+            
+            // Log execution state transition to completed
+            logger.log_execution_state_transition(
+                idx_to_execute,
+                incarnation,
+                "Executing",
+                "Executed",
+                &format!("Execution completed with result: {}", execution_result_str),
+                "Execute",
+            );
             
             logger.log_transaction_finish(
                 idx_to_execute,
@@ -1277,6 +1295,16 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
+                    // Log task dispatch for validation
+                    if let Some(logger) = get_global_logger() {
+                        logger.log_task_dispatch(
+                            txn_idx,
+                            incarnation,
+                            "ValidationTask",
+                            &format!("Validating transaction {} incarnation {} wave {}", txn_idx, incarnation, wave),
+                        );
+                    }
+                    
                     let valid = Self::validate(
                         txn_idx,
                         last_input_output,
@@ -1284,6 +1312,17 @@ where
                         versioned_cache,
                         skip_module_reads_validation.load(Ordering::Relaxed),
                     );
+                    
+                    // Log validation result
+                    if let Some(logger) = get_global_logger() {
+                        logger.log_transaction_validate(
+                            txn_idx,
+                            incarnation,
+                            valid,
+                            &format!("Validation result: {}", if valid { "VALID" } else { "INVALID" }),
+                        );
+                    }
+                    
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,
@@ -1299,6 +1338,16 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
+                    // Log task dispatch for execution
+                    if let Some(logger) = get_global_logger() {
+                        logger.log_task_dispatch(
+                            txn_idx,
+                            incarnation,
+                            "ExecutionTask",
+                            &format!("Executing transaction {} incarnation {}", txn_idx, incarnation),
+                        );
+                    }
+                    
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
@@ -1317,6 +1366,17 @@ where
                             incarnation,
                         ),
                     )?;
+                    
+                    // Log execution finish
+                    if let Some(logger) = get_global_logger() {
+                        logger.log_execution_finish(
+                            txn_idx,
+                            incarnation,
+                            needs_suffix_validation,
+                            &format!("Execution completed, needs_suffix_validation: {}", needs_suffix_validation),
+                        );
+                    }
+                    
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {

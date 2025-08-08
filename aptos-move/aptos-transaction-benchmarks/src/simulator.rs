@@ -2,9 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::collections::HashMap;
 use std::time::Instant;
+use std::sync::Arc;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use serde::{Deserialize, Serialize};
 use aptos_vm::{VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
+use num_cpus;
 use aptos_vm_logging::disable_speculative_logging;
-use aptos_block_executor::block_stm_logger::{init_global_logger, LoggingConfig};
+use aptos_block_executor::block_stm_logger::{init_global_logger, LoggingConfig, BlockSTMLogger};
 use aptos_language_e2e_tests::{
     account_universe::{AccountPickStyle, AccountUniverse, AccountUniverseGen}, 
     common_transactions::{
@@ -44,9 +49,47 @@ macro_rules! print_tps {
     };
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionData {
+    pub from_address: String,
+    pub to_address: String,
+    pub amount: u64,
+    pub transaction_hash: String,
+    pub block_number: u64,
+    pub transaction_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CsvTransactionRecord {
+    pub csv_index: usize,
+    pub sender_address: String,
+    pub receiver_address: String,
+    pub amount: u64,
+    pub timestamp: u64,
+    pub transaction_hash: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DetailedExecutionMetrics {
+    pub execution_count: u64,
+    pub validation_count: u64,
+    pub abort_count: u64,
+    pub suspend_count: u64,
+    pub avg_suspend_time_us: f64,
+    pub total_suspend_time_us: f64,
+    pub execution_time_ms: u128,
+    pub tps: usize,
+}
+
 pub struct Simulator{
     account_universe: AccountUniverse,
     executor: FakeExecutor,
+    // 新增：日志相关字段
+    logger: Option<Arc<BlockSTMLogger>>,
+    log_enabled: bool,
+    csv_data: Option<Vec<TransactionData>>,
+    current_block_id: u64,
+    log_output_dir: Option<String>,
 }
 
 //for experiment
@@ -71,6 +114,229 @@ impl Simulator{
         Self {
             account_universe: universe,
             executor,
+            logger: None,
+            log_enabled: false,
+            csv_data: None,
+            current_block_id: 0,
+            log_output_dir: None,
+        }
+    }
+
+    // 新增：支持日志功能的构造函数
+    pub fn new_with_logging(
+        num_accounts: usize,
+        enable_logging: bool,
+        log_output_dir: Option<String>,
+    ) -> Self {
+        let mut runner = TestRunner::default();
+        let balance = 500_000 * 1_000_000 * 5 as u64;
+        let universe_strategy = AccountUniverseGen::strategy(
+            num_accounts, 
+            balance..(balance + 1), 
+            AccountPickStyle::Unlimited
+        );
+
+        let universe_gen = universe_strategy
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
+        let executor = FakeExecutor::from_head_genesis();
+        
+        let universe = universe_gen.setup_gas_cost_stability(executor.state_store());
+
+        Self {
+            account_universe: universe,
+            executor,
+            logger: None,
+            log_enabled: enable_logging,
+            csv_data: None,
+            current_block_id: 0,
+            log_output_dir,
+        }
+    }
+
+    // 新增：初始化日志系统
+    pub fn setup_logging_environment(&mut self) -> Result<(), String> {
+        if !self.log_enabled {
+            return Ok(());
+        }
+
+        let config = if let Some(ref log_dir) = self.log_output_dir {
+            LoggingConfig {
+                enabled: true,
+                log_dir: std::path::PathBuf::from(log_dir),
+                log_level: aptos_block_executor::block_stm_logger::LogLevel::Debug,
+                max_file_size: 100 * 1024 * 1024, // 100MB
+                buffer_size: 10000,
+                async_logging: true,
+                include_read_write_details: true,
+            }
+        } else {
+            LoggingConfig::default()
+        };
+        
+        init_global_logger(config)
+            .map_err(|e| format!("Failed to initialize logger: {:?}", e))?;
+        
+        println!("Block-STM logger initialized with output dir: {:?}", 
+                self.log_output_dir);
+        Ok(())
+    }
+
+    // 新增：加载CSV数据
+    pub fn load_csv_data(&mut self, csv_path: &str) -> Result<Vec<(usize, usize)>, Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+        
+        println!("Loading CSV data from: {}", csv_path);
+        
+        let file = File::open(csv_path)?;
+        let reader = BufReader::new(file);
+        let mut transaction_graph = Vec::new();
+        let mut csv_data = Vec::new();
+        
+        // Skip header line and parse CSV
+        for (line_num, line) in reader.lines().enumerate() {
+            if line_num == 0 { continue; } // Skip header
+            let line = line?;
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 3 {
+                if let (Ok(from), Ok(to)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
+                    transaction_graph.push((from, to));
+                    
+                    // Store CSV data for mapping
+                    let transaction_data = TransactionData {
+                        from_address: format!("account_{}", from),
+                        to_address: format!("account_{}", to),
+                        amount: parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1),
+                        transaction_hash: format!("txn_{}_{}_to_{}", line_num, from, to),
+                        block_number: self.current_block_id,
+                        transaction_index: line_num - 1,
+                    };
+                    csv_data.push(transaction_data);
+                }
+            }
+        }
+        
+        self.csv_data = Some(csv_data);
+        println!("Loaded {} transactions from CSV", transaction_graph.len());
+        Ok(transaction_graph)
+    }
+
+    // 新增：处理交易映射
+    pub fn process_transaction_mapping(&self, transactions: &[SignatureVerifiedTransaction]) {
+        if !self.log_enabled || self.csv_data.is_none() {
+            return;
+        }
+        
+        if let Some(ref csv_data) = self.csv_data {
+            for (block_stm_index, csv_record) in csv_data.iter().enumerate() {
+                if block_stm_index < transactions.len() {
+                     // 使用日志宏记录交易映射关系
+                     aptos_block_executor::log_transaction_mapping!(
+                         block_stm_index as u32,
+                         csv_record.transaction_index,
+                         self.current_block_id,
+                         "CSV_to_BlockSTM",
+                         &csv_record.transaction_hash,
+                         &format!("BlockSTM_{}", block_stm_index)
+                     );
+                 }
+            }
+        }
+    }
+
+    // 新增：从CSV文件读取交易数据
+    pub fn load_transactions_from_csv(
+        &mut self,
+        csv_file_path: &str,
+        max_transactions: Option<usize>,
+    ) -> Result<(Vec<SignatureVerifiedTransaction>, Vec<CsvTransactionRecord>), String> {
+        let file = File::open(csv_file_path)
+            .map_err(|e| format!("Failed to open CSV file: {}", e))?;
+        let reader = BufReader::new(file);
+        
+        let mut csv_records = Vec::new();
+        let mut transaction_graph = Vec::new();
+        let _address_to_account_idx: HashMap<String, usize> = HashMap::new();
+        let _next_account_idx = 0;
+        
+        for (line_idx, line) in reader.lines().enumerate() {
+            if line_idx == 0 { continue; } // 跳过标题行
+            
+            if let Some(max) = max_transactions {
+                if line_idx > max {
+                    break;
+                }
+            }
+            
+            let line = line.map_err(|e| format!("Failed to read line {}: {}", line_idx, e))?;
+            let parts: Vec<&str> = line.split(',').collect();
+            
+            if parts.len() < 3 {
+                continue; // 跳过格式不正确的行
+            }
+            
+            // 解析发送方和接收方账户索引
+            let sender_idx = parts[0].trim().parse::<usize>()
+                .map_err(|e| format!("Invalid sender index at line {}: {}", line_idx, e))?;
+            let receiver_idx = parts[1].trim().parse::<usize>()
+                .map_err(|e| format!("Invalid receiver index at line {}: {}", line_idx, e))?;
+            
+            // 确保有足够的账户
+            if sender_idx >= self.account_universe.num_accounts() || 
+               receiver_idx >= self.account_universe.num_accounts() {
+                return Err(format!("Account index out of range at line {}. Sender: {}, Receiver: {}, Available accounts: {}", 
+                                 line_idx, sender_idx, receiver_idx, self.account_universe.num_accounts()));
+            }
+            
+            transaction_graph.push((sender_idx, receiver_idx));
+            
+            // 创建CSV记录
+            let sender_addr = format!("account_{}", sender_idx);
+            let receiver_addr = format!("account_{}", receiver_idx);
+            let amount = parts.get(2).unwrap_or(&"1000000").trim().parse::<u64>().unwrap_or(1000000);
+            let timestamp = parts.get(3).unwrap_or(&"0").trim().parse::<u64>().unwrap_or(0);
+            
+            csv_records.push(CsvTransactionRecord {
+                csv_index: line_idx - 1, // 减1因为跳过了标题行
+                sender_address: sender_addr,
+                receiver_address: receiver_addr,
+                amount,
+                timestamp,
+                transaction_hash: format!("csv_txn_{}", line_idx - 1),
+            });
+        }
+        
+        println!("Loaded {} transaction records from CSV", csv_records.len());
+        
+        // 生成交易
+        let transactions = self.gen_transaction_for_erc20(transaction_graph);
+        
+        Ok((transactions, csv_records))
+    }
+
+    // 新增：记录详细的交易映射关系（包含CSV信息）
+    fn log_detailed_transaction_mappings(
+        &self,
+        transactions: &[SignatureVerifiedTransaction],
+        csv_records: &[CsvTransactionRecord],
+    ) {
+        if !self.log_enabled {
+            return;
+        }
+        
+        for (block_stm_index, csv_record) in csv_records.iter().enumerate() {
+            if block_stm_index < transactions.len() {
+                aptos_block_executor::log_transaction_mapping!(
+                    block_stm_index as u32,
+                    csv_record.csv_index,
+                    self.current_block_id,
+                    &csv_record.transaction_hash,
+                    &csv_record.sender_address,
+                    "0" // sequence_number，这里简化处理
+                );
+            }
         }
     }
 
@@ -216,6 +482,33 @@ impl Simulator{
         
         let block_size = transactions.len();
         
+        // 确保全局日志器已初始化
+        if self.log_enabled {
+            if let Some(ref log_dir) = self.log_output_dir {
+                // 重新初始化全局日志器以确保在并行执行中可用
+                let config = aptos_block_executor::block_stm_logger::LoggingConfig {
+                    enabled: true,
+                    log_dir: log_dir.clone().into(),
+                    log_level: aptos_block_executor::block_stm_logger::LogLevel::Debug,
+                    max_file_size: 100 * 1024 * 1024, // 100MB in bytes
+                    buffer_size: 8192,
+                    async_logging: true,
+                    include_read_write_details: true,
+                };
+                if let Err(e) = aptos_block_executor::block_stm_logger::init_global_logger(config) {
+                    eprintln!("Failed to re-initialize global logger: {}", e);
+                } else {
+                    println!("Global logger re-initialized for parallel execution");
+                }
+            }
+        }
+        
+        // 记录区块执行开始
+        if self.log_enabled {
+            println!("Block-STM parallel execution start: block {}, {} transactions, concurrency {}", 
+                    self.current_block_id, block_size, concurrency_level_per_shard);
+        }
+        
         // Reset counters before execution
         let execution_before = counters::TASK_EXECUTE_SECONDS.get_sample_count();
         let validation_before = counters::TASK_VALIDATE_SECONDS.get_sample_count();
@@ -259,6 +552,17 @@ impl Simulator{
             0.0
         };
         
+        let tps = block_size * 1000 / exec_time as usize;
+        
+        // 记录区块执行结束
+        if self.log_enabled {
+            let successful_txns = output.iter().filter(|o| matches!(o.status(), TransactionStatus::Keep(ExecutionStatus::Success))).count();
+            let aborted_txns = output.len() - successful_txns;
+            
+            println!("Block-STM parallel execution end: block {}, {} transactions, TPS: {}, successful: {}, aborted: {}", 
+                    self.current_block_id, block_size, tps, successful_txns, aborted_txns);
+        }
+        
         println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
             execution_total,
             validation_total,
@@ -267,7 +571,102 @@ impl Simulator{
             avg_suspend_time * 1000000.0,
             suspend_time_total * 1000000.0
         );
-        (output, block_size * 1000 / exec_time as usize)
+        (output, tps)
+    }
+
+    // 新增：增强的并行执行方法，返回详细指标
+    fn execute_benchmark_parallel_with_metrics(
+        &self,
+        transactions: &[SignatureVerifiedTransaction],
+        concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> (Vec<TransactionOutput>, DetailedExecutionMetrics) {
+        use aptos_block_executor::counters;
+        use aptos_types::block_executor::config::{BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorModuleCacheLocalConfig};
+        
+        let block_size = transactions.len();
+        
+        // 记录区块执行开始
+        if self.log_enabled {
+            println!("Block-STM parallel execution with metrics start: block {}, {} transactions, concurrency {}", 
+                    self.current_block_id, block_size, concurrency_level_per_shard);
+        }
+        
+        // Reset counters before execution
+        let execution_before = counters::TASK_EXECUTE_SECONDS.get_sample_count();
+        let validation_before = counters::TASK_VALIDATE_SECONDS.get_sample_count();
+        let abort_before = counters::SPECULATIVE_ABORT_COUNT.get();
+        let suspend_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count();
+        let suspend_time_before = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum();
+        
+        let timer = Instant::now();
+        let txn_provider = DefaultTxnProvider::new_without_info(transactions.to_vec());
+        let block_executor = AptosVMBlockExecutor::new();
+        
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: concurrency_level_per_shard,
+                allow_fallback: true,
+                discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+            },
+            onchain: aptos_types::block_executor::config::BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
+        };
+        
+        let output = block_executor.execute_block_with_config(
+            &txn_provider,
+            self.executor.state_store(),
+            config,
+            aptos_types::block_executor::transaction_slice_metadata::TransactionSliceMetadata::unknown(),
+        )
+        .expect("VM should not fail to start")
+        .into_transaction_outputs_forced();
+        let exec_time = timer.elapsed().as_millis();
+        
+        // Calculate deltas for this execution
+        let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
+        let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
+        let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
+        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - suspend_time_before;
+        let avg_suspend_time = if suspend > 0 {
+            suspend_time_total / suspend as f64
+        } else {
+            0.0
+        };
+        
+        let tps = block_size * 1000 / exec_time as usize;
+        
+        // 记录区块执行结束
+        if self.log_enabled {
+            let successful_txns = output.iter().filter(|o| matches!(o.status(), TransactionStatus::Keep(ExecutionStatus::Success))).count();
+            let aborted_txns = output.len() - successful_txns;
+            
+            println!("Block-STM parallel execution with metrics end: block {}, TPS: {}, successful: {}, aborted: {}", 
+                    self.current_block_id, tps, successful_txns, aborted_txns);
+        }
+        
+        let metrics = DetailedExecutionMetrics {
+            execution_count: execution_total,
+            validation_count: validation_total,
+            abort_count: abort,
+            suspend_count: suspend,
+            avg_suspend_time_us: avg_suspend_time * 1000000.0,
+            total_suspend_time_us: suspend_time_total * 1000000.0,
+            execution_time_ms: exec_time,
+            tps,
+        };
+        
+        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+            execution_total,
+            validation_total,
+            abort,
+            suspend,
+            avg_suspend_time * 1000000.0,
+            suspend_time_total * 1000000.0
+        );
+        
+        (output, metrics)
     }
 
     pub fn execute_blockstm_benchmark(
@@ -278,6 +677,7 @@ impl Simulator{
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
+        println!("DEBUG: execute_blockstm_benchmark called with run_par={}, run_seq={}, concurrency_level={}", run_par, run_seq, concurrency_level_per_shard);
         let (output, par_tps) = if run_par {
             if concurrency_level_per_shard == 1 {
                 // For single core, use sequential execution path
@@ -686,61 +1086,39 @@ impl Simulator{
         maybe_block_gas_limit: Option<u64>,
         concurrency_level: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs::File;
-        use std::io::{BufRead, BufReader};
         disable_speculative_logging();
         
-        // Initialize Block-STM logger from environment variables
-        let logging_config = LoggingConfig::default();
-        println!("Block-STM logging config: enabled={}, log_dir={:?}, log_level={:?}", 
-                 logging_config.enabled, logging_config.log_dir, logging_config.log_level);
-        
-        if logging_config.enabled {
-            match init_global_logger(logging_config) {
-                Ok(()) => {
-                    println!("Block-STM logging initialized successfully");
-                },
-                Err(e) => {
-                    eprintln!("Failed to initialize Block-STM logger: {}", e);
-                    eprintln!("Continuing without logging...");
-                }
-            }
-        } else {
-            println!("Block-STM logging disabled (BLOCK_STM_LOG_LEVEL not set or invalid)");
+        // 使用新的日志环境设置方法
+        if let Err(e) = self.setup_logging_environment() {
+            eprintln!("Failed to setup logging environment: {}", e);
+            eprintln!("Continuing without logging...");
         }
         
         println!("Reading ERC20 historic data from: {}", data_path);
         
-        // Read CSV file
-        let file = File::open(&data_path)?;
-        let reader = BufReader::new(file);
-        let mut transaction_graph = Vec::new();
-        
-        // Skip header line and parse CSV
-        for (line_num, line) in reader.lines().enumerate() {
-            if line_num == 0 { continue; } // Skip header
-            let line = line?;
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 3 {
-                if let (Ok(from), Ok(to)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
-                    transaction_graph.push((from, to));
-                }
-            }
-        }
-        
-        println!("Loaded {} transactions from CSV", transaction_graph.len());
+        // 使用新的CSV数据加载方法
+        let transaction_graph = self.load_csv_data(&data_path)?;
         
         // Generate transactions
         let transactions = self.gen_transaction_for_erc20(transaction_graph);
         println!("Generated {} signature verified transactions", transactions.len());
+        
+        // 处理交易映射（如果启用了日志）
+        self.process_transaction_mapping(&transactions);
+        
+        // 记录基准测试开始
+        if self.log_enabled {
+            println!("Block-STM logging enabled for block {}, {} transactions, concurrency level {}", 
+                    self.current_block_id, transactions.len(), concurrency_level);
+        }
         
         // Run warmups
         for i in 0..num_warmups {
             println!("Warmup run {}/{}", i + 1, num_warmups);
             let _ = self.execute_blockstm_benchmark(
                 transactions.clone(),
-                !skip_parallel,
-                !skip_sequential,
+                skip_parallel,  // run_par: directly use skip_parallel (already negated in main.rs)
+                skip_sequential, // run_seq: directly use skip_sequential (already negated in main.rs)
                 concurrency_level,
                 maybe_block_gas_limit,
             );
@@ -751,14 +1129,167 @@ impl Simulator{
             println!("Benchmark run {}/{}", i + 1, num_runs);
             let (_par_tps, _seq_tps) = self.execute_blockstm_benchmark(
                 transactions.clone(),
-                !skip_parallel,
-                !skip_sequential,
+                skip_parallel,  // run_par: directly use skip_parallel (already negated in main.rs)
+                skip_sequential, // run_seq: directly use skip_sequential (already negated in main.rs)
                 concurrency_level,
                 maybe_block_gas_limit,
             );
             // TPS results are already printed inside execute_blockstm_benchmark
         }
         
+        // 记录基准测试结束
+        if self.log_enabled {
+            println!("Block-STM ERC20 historic replay end: block {}, {} transactions, concurrency {}", 
+                    self.current_block_id, transactions.len(), concurrency_level);
+        }
+        
         Ok(())
+    }
+
+    // 新增：完整的CSV回放测试方法
+    pub fn replay_with_full_logging(
+        &mut self,
+        data_path: &str,
+        concurrency_level: usize,
+        num_warmups: usize,
+        num_runs: usize,
+    ) -> Result<Vec<DetailedExecutionMetrics>, Box<dyn std::error::Error>> {
+        // 强制启用日志记录
+        self.log_enabled = true;
+        
+        // 设置日志环境
+         let _ = self.setup_logging_environment();
+         
+         // 记录回放开始
+         println!("Block-STM CSV replay start: block {}, concurrency {}, data_path: {}", 
+                 self.current_block_id, concurrency_level, data_path);
+         
+         // 加载和验证CSV数据
+         let _ = self.load_csv_data(data_path);
+         let (transactions, csv_records) = self.load_transactions_from_csv(data_path, None)?;
+         
+         // 如果没有CSV记录，生成交易
+         let transactions = if transactions.is_empty() {
+             let transaction_graph = self.load_csv_data(data_path)?;
+             self.gen_transaction_for_erc20(transaction_graph)
+         } else {
+             transactions
+         };
+        
+        // 记录CSV数据统计
+        println!("Block {} DataLoaded CSV with {} records", 
+            self.current_block_id, csv_records.len());
+        
+        // 记录详细的交易映射
+        self.log_detailed_transaction_mappings(&transactions, &csv_records);
+        
+        let mut metrics_results = Vec::new();
+        
+        // 热身运行
+        for warmup_idx in 0..num_warmups {
+            println!("Block {} Start Warmup_{} with {} transactions at concurrency {}", 
+                self.current_block_id, warmup_idx, transactions.len(), concurrency_level);
+            let (_, metrics) = self.execute_benchmark_parallel_with_metrics(
+                &transactions,
+                concurrency_level,
+                None,
+            );
+            println!("Block {} End Warmup_{} with {} transactions, TPS: {}", 
+                self.current_block_id, warmup_idx, transactions.len(), metrics.tps);
+        }
+        
+        // 基准测试运行
+        for run_idx in 0..num_runs {
+            println!("Block {} Start Benchmark_Run_{} with {} transactions at concurrency {}", 
+                self.current_block_id, run_idx, transactions.len(), concurrency_level);
+            
+            let (outputs, metrics) = self.execute_benchmark_parallel_with_metrics(
+                &transactions,
+                concurrency_level,
+                None,
+            );
+            
+            // 验证执行结果
+            let successful_count = outputs.iter()
+                .filter(|o| matches!(o.status(), TransactionStatus::Keep(ExecutionStatus::Success)))
+                .count();
+            let failed_count = outputs.len() - successful_count;
+            
+            if let Some(logger) = aptos_block_executor::block_stm_logger::get_global_logger() {
+                logger.log_performance_metric(
+                    "execution_results",
+                    successful_count as f64,
+                    None,
+                    std::collections::HashMap::from([
+                        ("successful_count".to_string(), successful_count.to_string()),
+                        ("failed_count".to_string(), failed_count.to_string()),
+                        ("abort_count".to_string(), metrics.abort_count.to_string()),
+                        ("suspend_count".to_string(), metrics.suspend_count.to_string())
+                    ])
+                );
+            }
+            
+            println!("Block {} End: Benchmark_Run_{}, transactions: {}, concurrency: {}, tps: {}, execution_time_ms: {}",
+                self.current_block_id,
+                run_idx,
+                transactions.len(),
+                concurrency_level,
+                metrics.tps,
+                metrics.execution_time_ms
+            );
+            
+            metrics_results.push(metrics);
+        }
+        
+        // 记录回放结束
+        let avg_tps = metrics_results.iter().map(|m| m.tps).sum::<usize>() / metrics_results.len();
+        println!("Block {} End CSV_Replay with {} transactions, avg TPS: {}", 
+            self.current_block_id, transactions.len(), avg_tps);
+        
+        Ok(metrics_results)
+    }
+
+    // 新增：执行完整的CSV回放基准测试
+    pub fn execute_csv_replay_benchmark(
+        &mut self,
+        data_path: &str,
+        concurrency_level: usize,
+    ) -> Result<(Vec<DetailedExecutionMetrics>, Vec<CsvTransactionRecord>), Box<dyn std::error::Error>> {
+        // 强制启用日志记录
+        self.log_enabled = true;
+        
+        // 设置日志环境
+         let _ = self.setup_logging_environment();
+         
+         // 加载CSV数据和交易记录
+         let _ = self.load_csv_data(data_path);
+         let (transactions, csv_records) = self.load_transactions_from_csv(data_path, None)?;
+         
+         // 如果没有CSV记录，生成交易
+         let transactions = if transactions.is_empty() {
+             let transaction_graph = self.load_csv_data(data_path)?;
+             self.gen_transaction_for_erc20(transaction_graph)
+         } else {
+             transactions
+         };
+        
+        // 记录详细的交易映射
+        self.log_detailed_transaction_mappings(&transactions, &csv_records);
+        
+        // 执行基准测试
+        let (outputs, metrics) = self.execute_benchmark_parallel_with_metrics(
+            &transactions,
+            concurrency_level,
+            None,
+        );
+        
+        // 验证所有交易都成功执行
+        for (i, output) in outputs.iter().enumerate() {
+            if !matches!(output.status(), TransactionStatus::Keep(ExecutionStatus::Success)) {
+                return Err(format!("Transaction {} failed: {:?}", i, output.status()).into());
+            }
+        }
+        
+        Ok((vec![metrics], csv_records))
     }
 }

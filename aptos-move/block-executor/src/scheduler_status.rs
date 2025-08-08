@@ -4,7 +4,10 @@
 // TODO(BlockSTMv2): enable dead code lint.
 #![allow(dead_code)]
 
-use crate::scheduler_v2::ExecutionQueueManager;
+use crate::{
+    block_stm_logger::get_global_logger,
+    scheduler_v2::ExecutionQueueManager,
+};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
@@ -403,7 +406,7 @@ impl ExecutionStatuses {
     /// - `Ok(true)` if this call changed the state from stalled to unstalled (num_stalls 1→0)
     /// - `Ok(false)` if the transaction remains stalled after this call
     /// - `Err` if there was an error removing the stall (e.g., no matching add_stall)
-    pub(crate) fn remove_stall(&self, txn_idx: TxnIndex) -> Result<bool, PanicError> {
+    pub(crate) fn remove_stall(&self, txn_idx: TxnIndex, owner_txn: TxnIndex) -> Result<bool, PanicError> {
         let status = &self.statuses[txn_idx as usize];
         let prev_num_stalls = status.num_stalls.fetch_sub(1, Ordering::SeqCst);
 
@@ -465,9 +468,22 @@ impl ExecutionStatuses {
         let status = &self.statuses[txn_idx as usize];
 
         let status_guard = &mut *status.status_with_incarnation.lock();
+        let old_status = format!("{:?}", status_guard.status);
         let ret = status_guard.start_executing();
 
         if ret.is_some() {
+            // Log status transition
+            if let Some(logger) = get_global_logger() {
+                logger.log_execution_state_transition(
+                    txn_idx,
+                    ret.unwrap(),
+                    &format!("{:?}", old_status),
+                    "Executing",
+                    "start_executing",
+                    "Execute"
+                );
+            }
+            
             // When status is PendingScheduling the dependency status should be
             // WaitForExecution (default or set by abort under lock).
             status.swap_dependency_status_any(
@@ -548,6 +564,18 @@ impl ExecutionStatuses {
 
         match status_guard.status {
             SchedulingStatus::Executing => {
+                // Log status transition
+                if let Some(logger) = get_global_logger() {
+                    logger.log_execution_state_transition(
+                        txn_idx,
+                        finished_incarnation,
+                        "Executing",
+                        "Executed",
+                        "finish_execution",
+                        "Execute"
+                    );
+                }
+                
                 status_guard.status = SchedulingStatus::Executed;
 
                 let new_status_flag = if status.is_stalled() {
@@ -564,6 +592,18 @@ impl ExecutionStatuses {
                 Ok(true)
             },
             SchedulingStatus::Aborted => {
+                // Log status transition
+                if let Some(logger) = get_global_logger() {
+                    logger.log_execution_state_transition(
+                        txn_idx,
+                        finished_incarnation + 1,
+                        "Aborted",
+                        "PendingScheduling",
+                        "finish_execution",
+                        "Execute"
+                    );
+                }
+                
                 self.to_pending_scheduling(txn_idx, status_guard, finished_incarnation + 1, true);
                 Ok(false)
             },
@@ -889,7 +929,7 @@ mod tests {
         );
 
         if stall_before_finish {
-            assert_ok_eq!(statuses.remove_stall(txn_idx), true);
+            assert_ok_eq!(statuses.remove_stall(txn_idx, 0), true);
         }
         statuses
             .execution_queue_manager
@@ -1126,15 +1166,15 @@ mod tests {
         assert_ok_eq!(statuses.add_stall(0), false);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 4);
 
-        assert_ok_eq!(statuses.remove_stall(0), false);
-        assert_ok_eq!(statuses.remove_stall(0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DependencyStatus::ShouldDefer as u8
         );
-        assert_ok_eq!(statuses.remove_stall(0), false);
-        assert_ok_eq!(statuses.remove_stall(0), true);
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DependencyStatus::IsSafe as u8
@@ -1147,7 +1187,7 @@ mod tests {
             DependencyStatus::ShouldDefer as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 1);
-        assert_ok_eq!(statuses.remove_stall(0), true);
+        assert_ok_eq!(statuses.remove_stall(0, 0), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
             DependencyStatus::IsSafe as u8
@@ -1159,9 +1199,9 @@ mod tests {
             DependencyStatus::ShouldDefer as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
-        assert_ok_eq!(statuses.remove_stall(0), false);
-        assert_ok_eq!(statuses.remove_stall(0), true);
-        assert_err!(statuses.remove_stall(0));
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), true);
+        assert_err!(statuses.remove_stall(0, 0));
     }
 
     #[test_case(false)]
@@ -1205,21 +1245,21 @@ mod tests {
         );
 
         // remove_stalls work normally, but w.o. changing the dependency shortcut flag.
-        assert_ok_eq!(statuses.remove_stall(0), false);
-        assert_ok_eq!(statuses.remove_stall(0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
+        assert_ok_eq!(statuses.remove_stall(0, 0), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
-        assert_ok_eq!(statuses.remove_stall(0), true);
+        assert_ok_eq!(statuses.remove_stall(0, 0), true);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 0);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             expected_flag
         );
 
-        assert_err!(statuses.remove_stall(0));
+        assert_err!(statuses.remove_stall(0, 0));
     }
 
     #[test]
@@ -1240,7 +1280,7 @@ mod tests {
 
         assert_err!(statuses.add_stall(0));
         assert_err!(statuses.add_stall(1));
-        assert_ok_eq!(statuses.remove_stall(2), true);
+        assert_ok_eq!(statuses.remove_stall(2, 0), true);
         // Not re-scheduled (new incarnation = 1 with idx > executed_once_max_idx).
         manager.assert_execution_queue(&vec![]);
 
@@ -1288,8 +1328,8 @@ mod tests {
         );
 
         // remove_stalls work normally, but w.o. changing the dependency shortcut flag.
-        assert_ok_eq!(statuses.remove_stall(txn_idx), false);
-        assert_ok_eq!(statuses.remove_stall(txn_idx), false);
+        assert_ok_eq!(statuses.remove_stall(txn_idx, 0), false);
+        assert_ok_eq!(statuses.remove_stall(txn_idx, 0), false);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
@@ -1298,14 +1338,14 @@ mod tests {
         manager.assert_execution_queue(&vec![]);
 
         // Similar (inverted) test flow for remove_stalls.
-        assert_ok_eq!(statuses.remove_stall(txn_idx), true);
+        assert_ok_eq!(statuses.remove_stall(txn_idx, 0), true);
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 0);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
             DependencyStatus::ShouldDefer as u8
         );
         manager.assert_execution_queue(&vec![txn_idx]);
-        assert_err!(statuses.remove_stall(txn_idx));
+        assert_err!(statuses.remove_stall(txn_idx, 0));
     }
 
     fn set_shortcut_to_safe_or_provided(
@@ -1498,7 +1538,7 @@ mod tests {
             );
 
             // remove_stall succeeds as it should.
-            assert_ok_eq!(statuses.remove_stall(0), false);
+            assert_ok_eq!(statuses.remove_stall(0, 0), false);
             assert_eq!(statuses.get_status(0).num_stalls.load(Ordering::Relaxed), 1);
 
             statuses
@@ -1506,13 +1546,13 @@ mod tests {
                 .dependency_shortcut
                 .store(wrong_shortcut, Ordering::Relaxed);
             // Normal removal that would otherwise succeed should now return an error.
-            assert_err!(statuses.remove_stall(0));
+            assert_err!(statuses.remove_stall(0, 0));
         }
 
         // Number of stalls = 0 for txn 1.
-        assert_err!(statuses.remove_stall(1));
+        assert_err!(statuses.remove_stall(1, 0));
         // Incarnation 0 / err for txn 2.
-        assert_err!(statuses.remove_stall(2));
+        assert_err!(statuses.remove_stall(2, 0));
     }
 
     #[test]
@@ -1533,7 +1573,7 @@ mod tests {
 
             s.spawn(|_| {
                 // false due to the main thread incrementing stall count below.
-                assert_ok_eq!(statuses.remove_stall(0), false);
+                assert_ok_eq!(statuses.remove_stall(0, 0), false);
             });
 
             while status.num_stalls.load(Ordering::Relaxed) != 0 {}

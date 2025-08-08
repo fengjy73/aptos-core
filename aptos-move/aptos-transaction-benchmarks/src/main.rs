@@ -32,6 +32,7 @@ enum BenchmarkCommand {
     ParamSweep(ParamSweepOpt),
     Execute(ExecuteOpt),
     ReplayERC20(ReplayERC20HistoricOpt),
+    ReplayERC20Full(ReplayERC20FullOpt),
     Airdrop(CommonOpt),
     Ballot(CommonOpt),
     BallotSharding(CommonShardingOpt),
@@ -62,6 +63,27 @@ struct ReplayERC20HistoricOpt{
 
     #[clap(long,default_value_t=93000)]
     pub num_accounts:usize,
+
+    #[clap(long)]
+    pub output_file: Option<String>,
+
+    #[clap(long)]
+    pub concurrency_level: Option<usize>,
+}
+
+#[derive(Debug, Parser)]
+struct ReplayERC20FullOpt{
+    #[clap(long, default_value_t = 0)]
+    pub num_warmups: usize,
+
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long, default_value="data/ETH_2401_100000.csv")]
+    pub data_path: String,
+
+    #[clap(long, default_value_t=93000)]
+    pub num_accounts: usize,
 
     #[clap(long)]
     pub output_file: Option<String>,
@@ -169,17 +191,38 @@ fn replay_erc20_historic(opt: ReplayERC20HistoricOpt) -> Result<(), Box<dyn Erro
         }
     }
 
-    let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+    // 检查是否启用日志功能
+    let log_enabled = std::env::var("BLOCK_STM_LOG_LEVEL").is_ok();
+    let log_output_dir = std::env::var("BLOCK_STM_LOG_DIR").ok();
+    
+    // 使用新的支持日志功能的构造函数
+    let mut simulator = if log_enabled {
+        println!("Creating Simulator with logging enabled, output dir: {:?}", log_output_dir);
+        Simulator::new_with_logging(
+            opt.num_accounts,
+            true,
+            log_output_dir,
+        )
+    } else {
+        println!("Creating Simulator without logging");
+        Simulator::with_account_nums(opt.num_accounts)
+    };
+    
     let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
     let result = simulator.replay_erc20_historic(
         opt.data_path,
-        opt.skip_parallel,
-        opt.skip_sequential,
+        !opt.skip_parallel,
+        !opt.skip_sequential,
         opt.num_warmups,
         opt.num_runs,
         opt.maybe_block_gas_limit,
         concurrency_level,
     );
+    
+    match result {
+        Ok(_) => println!("ERC20 historic replay completed successfully"),
+        Err(e) => println!("Error during ERC20 historic replay: {}", e),
+    }
 
     // 如果指定了输出文件，将结果写入文件
     if let Some(output_path) = opt.output_file {
@@ -188,7 +231,77 @@ fn replay_erc20_historic(opt: ReplayERC20HistoricOpt) -> Result<(), Box<dyn Erro
         println!("Results written to: {}", output_path);
     }
 
-    result
+    Ok(())
+}
+
+fn replay_erc20_full(opt: ReplayERC20FullOpt) -> Result<(), Box<dyn Error>> {
+    // 如果指定了输出文件，确保目录存在
+    if let Some(ref output_path) = opt.output_file {
+        if let Some(parent_dir) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent_dir)?;
+        }
+    }
+
+    // 强制启用日志功能
+    std::env::set_var("BLOCK_STM_LOG_LEVEL", "DEBUG");
+    if std::env::var("BLOCK_STM_LOG_DIR").is_err() {
+        std::env::set_var("BLOCK_STM_LOG_DIR", "./test_logs_stage4_full");
+    }
+    
+    let log_output_dir = std::env::var("BLOCK_STM_LOG_DIR").ok();
+    
+    println!("Creating Simulator with full logging enabled, output dir: {:?}", log_output_dir);
+    let mut simulator = Simulator::new_with_logging(
+        opt.num_accounts,
+        true,
+        log_output_dir,
+    );
+    
+    let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
+    
+    println!("Starting full CSV replay with detailed logging...");
+    let metrics_results = simulator.replay_with_full_logging(
+        &opt.data_path,
+        concurrency_level,
+        opt.num_warmups,
+        opt.num_runs,
+    )?;
+    
+    // 输出详细的执行指标
+    println!("\n=== Full CSV Replay Results ===");
+    for (i, metrics) in metrics_results.iter().enumerate() {
+        println!("Run {}: TPS={}, Execution={}ms, Aborts={}, Suspends={}, Avg Suspend Time={:.2}us",
+            i + 1,
+            metrics.tps,
+            metrics.execution_time_ms,
+            metrics.abort_count,
+            metrics.suspend_count,
+            metrics.avg_suspend_time_us
+        );
+    }
+    
+    let avg_tps = metrics_results.iter().map(|m| m.tps).sum::<usize>() / metrics_results.len();
+    println!("Average TPS: {}", avg_tps);
+    
+    // 如果指定了输出文件，将结果写入文件
+    if let Some(output_path) = opt.output_file {
+        let mut file = fs::File::create(&output_path)?;
+        writeln!(file, "Full CSV Replay benchmark completed successfully")?;
+        writeln!(file, "Average TPS: {}", avg_tps)?;
+        for (i, metrics) in metrics_results.iter().enumerate() {
+            writeln!(file, "Run {}: TPS={}, Execution={}ms, Aborts={}, Suspends={}, Avg Suspend Time={:.2}us",
+                i + 1,
+                metrics.tps,
+                metrics.execution_time_ms,
+                metrics.abort_count,
+                metrics.suspend_count,
+                metrics.avg_suspend_time_us
+            )?;
+        }
+        println!("Results written to: {}", output_path);
+    }
+
+    Ok(())
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -316,6 +429,11 @@ fn main() {
         BenchmarkCommand::ReplayERC20(opt) => {
             if let Err(e) = replay_erc20_historic(opt) {
                 eprintln!("Error in replay_erc20_historic: {}", e);
+            }
+        },
+        BenchmarkCommand::ReplayERC20Full(opt) => {
+            if let Err(e) = replay_erc20_full(opt) {
+                eprintln!("Error in replay_erc20_full: {}", e);
             }
         },
         BenchmarkCommand::Airdrop(opt) => {

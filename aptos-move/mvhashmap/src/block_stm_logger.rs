@@ -6,7 +6,7 @@
 //! This module provides comprehensive logging capabilities for tracking transaction execution,
 //! concurrency control, read/write set changes, and performance metrics in Block-STM.
 
-use aptos_mvhashmap::types::{Incarnation, TxnIndex};
+use crate::types::{Incarnation, TxnIndex};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -572,6 +572,38 @@ impl BlockSTMLogger {
         self.log_event(event, LogLevel::Debug);
     }
 
+    /// Log scheduler task assignment
+    pub fn log_scheduler_task_assignment(&self) {
+        let event = LogEvent::SchedulerStateTransition {
+            timestamp: Self::current_timestamp_us(),
+            thread_id: Self::current_thread_id(),
+            old_state: "idle".to_string(),
+            new_state: "task_assigned".to_string(),
+            transaction_id: None,
+            trigger_reason: "task_assignment".to_string(),
+        };
+        self.log_event(event, LogLevel::Debug);
+    }
+
+    /// Log transaction commit
+    pub fn log_transaction_commit(
+        &self,
+        txn_id: TxnIndex,
+        incarnation: Incarnation,
+    ) {
+        let event = LogEvent::ExecutionStateTransition {
+            transaction_id: txn_id,
+            incarnation,
+            thread_id: Self::current_thread_id(),
+            timestamp: Self::current_timestamp_us(),
+            old_state: "executing".to_string(),
+            new_state: "committed".to_string(),
+            transition_reason: "commit_complete".to_string(),
+            execution_phase: "Commit".to_string(),
+        };
+        self.log_event(event, LogLevel::Debug);
+    }
+
     /// Log scheduler state transition
     pub fn log_scheduler_state_transition(
         &self,
@@ -698,87 +730,6 @@ impl BlockSTMLogger {
             mapped_data: mapped_data.to_string(),
         };
         self.log_event(event, LogLevel::Debug);
-    }
-
-    /// Log scheduler task assignment
-    pub fn log_scheduler_task_assignment(&self) {
-        let event = LogEvent::PerformanceMetric {
-            timestamp: Self::current_timestamp_us(),
-            metric_name: "scheduler_task_assignment".to_string(),
-            metric_value: 1.0,
-            transaction_id: None,
-            thread_id: Self::current_thread_id(),
-            additional_data: HashMap::new(),
-        };
-        self.log_event(event, LogLevel::Debug);
-    }
-
-    /// Log transaction commit
-    pub fn log_transaction_commit(&self, txn_id: TxnIndex, incarnation: Incarnation) {
-        let event = LogEvent::TransactionFinish {
-            transaction_id: txn_id,
-            incarnation,
-            thread_id: Self::current_thread_id(),
-            timestamp: Self::current_timestamp_us(),
-            execution_result: "Committed".to_string(),
-            duration_us: 0, // Duration not available in this context
-            gas_used: 0,    // Gas not available in this context
-            read_set_size: 0,
-            write_set_size: 0,
-        };
-        self.log_event(event, LogLevel::Info);
-    }
-
-    /// Log transaction validation
-    pub fn log_transaction_validate(
-        &self,
-        txn_id: TxnIndex,
-        incarnation: Incarnation,
-        validation_result: bool,
-        description: &str,
-    ) {
-        let event = LogEvent::TransactionValidate {
-            transaction_id: txn_id,
-            thread_id: Self::current_thread_id(),
-            timestamp: Self::current_timestamp_us(),
-            validation_result,
-            duration_us: 0,
-        };
-        self.log_event(event, LogLevel::Debug);
-    }
-
-    /// Log task dispatch
-    pub fn log_task_dispatch(
-        &self,
-        txn_id: TxnIndex,
-        incarnation: Incarnation,
-        task_type: &str,
-        description: &str,
-    ) {
-        self.log_scheduler_state_transition(
-            "IDLE",
-            "DISPATCHING",
-            Some(txn_id),
-            &format!("{}: {}", task_type, description),
-        );
-    }
-
-    /// Log execution finish
-    pub fn log_execution_finish(
-        &self,
-        txn_id: TxnIndex,
-        incarnation: Incarnation,
-        needs_suffix_validation: bool,
-        description: &str,
-    ) {
-        self.log_execution_state_transition(
-            txn_id,
-            incarnation,
-            "EXECUTING",
-            "FINISHED",
-            description,
-            "Execute",
-        );
     }
 
     /// Flush all buffers

@@ -35,6 +35,7 @@ proptest = { workspace = true }
 rayon = { workspace = true }
 csv = "1.1.0"
 rand = { workspace = true }
+serde = { workspace = true }
 
 [profile.release]
 debug = true

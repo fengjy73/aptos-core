@@ -3151,6 +3151,7 @@ dependencies = [
  "proptest-derive",
  "rayon",
  "serde",
+ "serde_json",
  "test-case",
 ]
 
@@ -4437,6 +4438,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "rayon",
+ "serde",
 ]
 
 [[package]]

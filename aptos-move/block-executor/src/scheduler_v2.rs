@@ -306,13 +306,25 @@ impl AbortedDependencies {
     // Inserts indices for which add_stall returned true into the propagation queue.
     fn add_stall(
         &mut self,
+        owner_txn: TxnIndex,
         statuses: &ExecutionStatuses,
         stall_propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
+        // Log stall propagation before processing
+        if let Some(logger) = get_global_logger() {
+            let affected_txns: Vec<TxnIndex> = self.not_stalled_deps.iter().cloned().collect();
+            logger.log_stall_propagation(owner_txn, affected_txns, "add_stall", "dependency_stall");
+        }
+        
         for idx in &self.not_stalled_deps {
             // Assert the invariant in tests.
             #[cfg(test)]
             assert!(!self.stalled_deps.contains(idx));
+
+            // Log individual dependency stall
+            if let Some(logger) = get_global_logger() {
+                logger.log_dependency_stall(*idx, vec![owner_txn]);
+            }
 
             if statuses.add_stall(*idx)? {
                 // May require recursive add_stalls.
@@ -331,15 +343,27 @@ impl AbortedDependencies {
     // uses execution queue manager to add the transaction to execution queue.
     fn remove_stall(
         &mut self,
+        owner_txn: TxnIndex,
         statuses: &ExecutionStatuses,
         stall_propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
+        // Log stall removal propagation before processing
+        if let Some(logger) = get_global_logger() {
+            let affected_txns: Vec<TxnIndex> = self.stalled_deps.iter().cloned().collect();
+            logger.log_stall_propagation(owner_txn, affected_txns, "remove_stall", "dependency_unstall");
+        }
+        
         for idx in &self.stalled_deps {
             // Assert the invariant in tests.
             #[cfg(test)]
             assert!(!self.not_stalled_deps.contains(idx));
 
-            if statuses.remove_stall(*idx)? {
+            // Log individual dependency unstall
+            if let Some(logger) = get_global_logger() {
+                logger.log_dependency_unstall(*idx, owner_txn);
+            }
+
+            if statuses.remove_stall(*idx, owner_txn)? {
                 // May require recursive remove_stalls.
                 stall_propagation_queue.insert(*idx as usize);
             }
@@ -592,6 +616,11 @@ impl SchedulerV2 {
     /// that transaction `i-1` has its `committed_marker` as `Committed`. This ensures strict
     /// sequential processing of commit hooks.
     pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
+        // Log commit start attempt
+        if let Some(logger) = get_global_logger() {
+            logger.log_scheduler_task_assignment();
+        }
+
         // Relaxed ordering due to armed lock acq-rel.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
 
@@ -670,6 +699,14 @@ impl SchedulerV2 {
     /// `[SchedulerV2::start_commit]`, and that the `queueing_commits_lock` was held
     /// by the worker during the execution of the commit hook and this call.
     pub(crate) fn end_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+        // Log commit completion
+        if let Some(logger) = get_global_logger() {
+            logger.log_transaction_commit(
+                txn_idx,
+                self.txn_statuses.incarnation(txn_idx),
+            );
+        }
+
         let prev_marker = self.committed_marker[txn_idx as usize].load(Ordering::Relaxed);
         if prev_marker != CommitMarkerFlag::CommitStarted as u8 {
             return Err(code_invariant_error(format!(
@@ -784,16 +821,48 @@ impl SchedulerV2 {
     /// TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     /// We can also have different versions (e.g. for testing) of next_task.
     pub(crate) fn next_task(&self) -> Result<TaskKind, PanicError> {
+        // Log scheduler task assignment
+        if let Some(logger) = get_global_logger() {
+            logger.log_scheduler_task_assignment();
+        }
+
         if self.is_done() {
+            // Log scheduler state transition
+            if let Some(logger) = get_global_logger() {
+                logger.log_scheduler_state_transition(
+                    "Active",
+                    "Done",
+                    None,
+                    "All transactions completed",
+                );
+            }
             return Ok(TaskKind::Done);
         }
 
         match self.pop_post_commit_task()? {
             Some(txn_idx) => {
+                // Log scheduler state transition for post-commit processing
+                if let Some(logger) = get_global_logger() {
+                    logger.log_scheduler_state_transition(
+                        "Idle",
+                        "PostCommitProcessing",
+                        Some(txn_idx),
+                        "Post-commit task dispatched",
+                    );
+                }
                 return Ok(TaskKind::PostCommitProcessing(txn_idx));
             },
             None => {
                 if self.is_halted() {
+                    // Log scheduler state transition
+                    if let Some(logger) = get_global_logger() {
+                        logger.log_scheduler_state_transition(
+                            "Active",
+                            "Halted",
+                            None,
+                            "Execution halted",
+                        );
+                    }
                     return Ok(TaskKind::Done);
                 }
             },
@@ -801,6 +870,15 @@ impl SchedulerV2 {
 
         if let Some(txn_idx) = self.txn_statuses.get_execution_queue_manager().pop_next() {
             if let Some(incarnation) = self.start_executing(txn_idx)? {
+                // Log scheduler state transition for execution task
+                if let Some(logger) = get_global_logger() {
+                    logger.log_scheduler_state_transition(
+                        "Idle",
+                        "TaskDispatched",
+                        Some(txn_idx),
+                        "Execution task dispatched",
+                    );
+                }
                 return Ok(TaskKind::Execute(txn_idx, incarnation));
             }
         }
@@ -1029,6 +1107,12 @@ impl SchedulerV2 {
     /// This mechanism ensures that stall states are consistently propagated based on the
     /// most up-to-date status of transactions.
     fn propagate(&self, mut stall_propagation_queue: BTreeSet<usize>) -> Result<(), PanicError> {
+        // Log the start of stall propagation
+        if let Some(logger) = get_global_logger() {
+            let affected_txns: Vec<TxnIndex> = stall_propagation_queue.iter().map(|&x| x as TxnIndex).collect();
+            logger.log_stall_propagation(0, affected_txns, "propagate", "stall_propagation_queue_processing");
+        }
+        
         // Dependencies of each transaction always have higher indices than the transaction itself.
         // This means that the stall propagation queue is always processed in ascending order of
         // transaction indices, and that the processing loop is guaranteed to terminate.
@@ -1046,10 +1130,10 @@ impl SchedulerV2 {
             {
                 // Still makes sense to propagate remove_stall.
                 aborted_deps_guard
-                    .remove_stall(&self.txn_statuses, &mut stall_propagation_queue)?;
+                    .remove_stall(task_idx as TxnIndex, &self.txn_statuses, &mut stall_propagation_queue)?;
             } else {
                 // Not executed or stalled - still makes sense to propagate add_stall.
-                aborted_deps_guard.add_stall(&self.txn_statuses, &mut stall_propagation_queue)?;
+                aborted_deps_guard.add_stall(task_idx as TxnIndex, &self.txn_statuses, &mut stall_propagation_queue)?;
             }
         }
         Ok(())
@@ -1236,11 +1320,11 @@ mod tests {
         let mut deps = AbortedDependencies::new();
 
         assert!(!deps.is_stalled);
-        assert_ok!(deps.add_stall(&statuses, &mut stall_propagation_queue));
+        assert_ok!(deps.add_stall(0, &statuses, &mut stall_propagation_queue));
         assert!(deps.is_stalled);
         deps.not_stalled_deps.insert(0);
         // Err because of incarnation 0.
-        assert_err!(deps.add_stall(&statuses, &mut stall_propagation_queue));
+        assert_err!(deps.add_stall(0, &statuses, &mut stall_propagation_queue));
         // From now on, mark 0 as already stalled.
         assert!(deps.stalled_deps.insert(0));
         assert!(deps.not_stalled_deps.remove(&0));
@@ -1250,7 +1334,7 @@ mod tests {
         manager.execution_queue.lock().clear();
         manager.execution_queue.lock().append(&mut (2..6).collect());
         deps.not_stalled_deps.append(&mut (2..6).collect());
-        assert_ok!(deps.add_stall(&statuses, &mut stall_propagation_queue));
+        assert_ok!(deps.add_stall(0, &statuses, &mut stall_propagation_queue));
 
         // Check the results: execution queue, propagation_queue, deps.stalled & not_stalled.
         assert_eq!(manager.execution_queue.lock().len(), 3);
@@ -1320,17 +1404,17 @@ mod tests {
         assert_eq!(statuses.len(), 8);
 
         deps.is_stalled = true;
-        assert_ok!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
+        assert_ok!(deps.remove_stall(0, &statuses, &mut stall_propagation_queue));
         assert!(!deps.is_stalled);
         deps.stalled_deps.insert(0);
         // Removing stall should fail because num_stalls = 0.
-        assert_err!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
+        assert_err!(deps.remove_stall(0, &statuses, &mut stall_propagation_queue));
         *statuses.get_status_mut(0) = ExecutionStatus::new_for_test(
             StatusWithIncarnation::new_for_test(SchedulingStatus::PendingScheduling, 0),
             1,
         );
         // Removing stall should fail because incarnation = 0.
-        assert_err!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
+        assert_err!(deps.remove_stall(0, &statuses, &mut stall_propagation_queue));
 
         let manager = &statuses.get_execution_queue_manager();
         manager.executed_once_max_idx.store(4, Ordering::Relaxed);
@@ -1341,7 +1425,7 @@ mod tests {
 
         manager.execution_queue.lock().clear();
         deps.stalled_deps.append(&mut (2..8).collect());
-        assert_ok!(deps.remove_stall(&statuses, &mut stall_propagation_queue,));
+        assert_ok!(deps.remove_stall(0, &statuses, &mut stall_propagation_queue,));
 
         // Check the results: scheduling queue, propagation_queue, deps.stalled & not_stalled.
         assert_eq!(manager.execution_queue.lock().len(), 2);
@@ -1443,7 +1527,7 @@ mod tests {
         assert!(!scheduler.txn_statuses.get_status(0).is_stalled());
         assert!(!scheduler.txn_statuses.get_status(2).is_stalled());
         assert!(scheduler.txn_statuses.get_status(3).is_stalled());
-        assert_ok_eq!(scheduler.txn_statuses.remove_stall(3), true);
+        assert_ok_eq!(scheduler.txn_statuses.remove_stall(3, 0), true);
 
         for i in 0..3 {
             assert_eq!(

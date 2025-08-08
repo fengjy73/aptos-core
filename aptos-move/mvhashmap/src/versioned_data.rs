@@ -247,6 +247,17 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
     ) -> Result<MVDataOutput<V>, MVDataError> {
         use MVDataError::*;
         use MVDataOutput::*;
+        
+        // Log MVHashMap read operation
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_read(
+                reader_txn_idx,
+                maybe_reader_incarnation.unwrap_or(0),
+                "versioned_data",
+                "read_attempt",
+                None,
+            );
+        }
 
         let mut iter = self
             .versioned_map
@@ -446,6 +457,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
     where
         Q: Equivalent<K> + Hash,
     {
+        // Log MVHashMap remove operation
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_write(
+                txn_idx,
+                0, // incarnation not available in remove
+                "versioned_data_remove",
+                0, // value_size not available here
+                "remove",
+            );
+        }
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert_some!(
@@ -510,6 +531,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
     where
         Q: Equivalent<K> + Hash,
     {
+        // Log MVHashMap fetch_data operation
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_read(
+                txn_idx,
+                0, // incarnation not available in fetch_data
+                "fetch_data",
+                "fetch_attempt",
+                None,
+            );
+        }
         self.values
             .get(key)
             .map(|v| v.read(txn_idx, None))
@@ -528,6 +559,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
     where
         Q: Equivalent<K> + Hash,
     {
+        // Log MVHashMap fetch_data_v2 operation
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_read(
+                txn_idx,
+                incarnation,
+                "fetch_data_v2",
+                "fetch_attempt",
+                None,
+            );
+        }
         self.values
             .get(key)
             .map(|v| v.read(txn_idx, Some(incarnation)))
@@ -646,6 +687,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         data: Arc<V>,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) {
+        // Log MVHashMap write operation
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_write(
+                txn_idx,
+                incarnation,
+                "versioned_data",
+                0, // value_size not available here
+                "write",
+            );
+        }
         let mut v = self.values.entry(key).or_default();
         Self::write_impl(
             &mut v,
@@ -666,6 +717,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         data: Arc<V>,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) -> BTreeSet<(TxnIndex, Incarnation)> {
+        // Log MVHashMap write operation (V2)
+        if let Some(logger) = crate::block_stm_logger::get_global_logger() {
+            logger.log_mvhashmap_write(
+                txn_idx,
+                incarnation,
+                "versioned_data_v2",
+                0, // value_size not available here
+                "write_v2",
+            );
+        }
         let mut v = self.values.entry(key).or_default();
         let (affected_dependencies, validation_passed) = v
             .split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(
