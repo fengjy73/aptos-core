@@ -27,6 +27,7 @@ module aptos_experimental::market_test_utils {
         is_taker: bool,
         is_cancelled: bool,
         metadata: M,
+        client_order_id: Option<u64>,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderIdType {
         let user_addr = signer::address_of(user);
@@ -39,7 +40,7 @@ module aptos_experimental::market_test_utils {
                 time_in_force, // order_type
                 option::none(), // trigger_condition
                 metadata,
-                option::none(),
+                client_order_id,
                 1000,
                 true,
                 callbacks
@@ -50,7 +51,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 is_bid, // is_buy
                 metadata,
-                option::none(), // client_order_id
+                client_order_id, // client_order_id
                 1000,
                 true,
                 callbacks
@@ -66,7 +67,7 @@ module aptos_experimental::market_test_utils {
         let order_id = order_place_event.get_order_id_from_event();
         order_place_event.verify_order_event(
             order_id,
-            option::none(), // client_order_id
+            client_order_id, // client_order_id
             market.get_market(),
             user_addr,
             size,
@@ -88,7 +89,7 @@ module aptos_experimental::market_test_utils {
             let order_cancel_event = events[1];
             order_cancel_event.verify_order_event(
                 order_id,
-                option::none(),
+                client_order_id,
                 market.get_market(),
                 user_addr,
                 size,
@@ -123,32 +124,33 @@ module aptos_experimental::market_test_utils {
                 max_fills.destroy_some()
             };
         // Taker order will be immediately match in the same transaction
-       let result =  if (taker_price.is_some()) {
-            market.place_limit_order(
-                taker,
-                taker_price.destroy_some(),
-                size,
-                is_bid, // is_bid
-                time_in_force, // order_type
-                option::none(), // trigger_condition
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            )
-        } else {
-            market.place_market_order(
-                taker,
-                size,
-                is_bid, // is_bid
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            )
-        };
+        let result =
+            if (taker_price.is_some()) {
+                market.place_limit_order(
+                    taker,
+                    taker_price.destroy_some(),
+                    size,
+                    is_bid, // is_bid
+                    time_in_force, // order_type
+                    option::none(), // trigger_condition
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            } else {
+                market.place_market_order(
+                    taker,
+                    size,
+                    is_bid, // is_bid
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            };
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
