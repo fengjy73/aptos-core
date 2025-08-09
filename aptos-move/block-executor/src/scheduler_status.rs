@@ -6,7 +6,6 @@
 
 use crate::{
     block_stm_logger::get_global_logger,
-    counters,
     scheduler_v2::ExecutionQueueManager,
 };
 use aptos_infallible::Mutex;

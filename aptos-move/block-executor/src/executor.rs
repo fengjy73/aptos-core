@@ -325,7 +325,6 @@ where
         }
 
         // Process execution result and record immediately to avoid borrowing issues
-        let mut resource_write_set = Vec::new();
         let maybe_output = match &execution_result {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output)
@@ -397,8 +396,6 @@ where
             read_set,
             execution_result,
             resource_write_set.clone(),
-            // TODO(BlockSTMv2): handle groups.
-            vec![],
         );
 
         // Log transaction finish and additional details
