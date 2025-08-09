@@ -100,7 +100,6 @@ where
         num_txn: usize,
         run_par: bool,
         run_seq: bool,
-        num_warmups: usize,
         num_runs: usize,
         num_executor_shards: usize,
         concurrency_level_per_shard: usize,
@@ -112,7 +111,7 @@ where
         let mut par_tps = Vec::new();
         let mut seq_tps = Vec::new();
 
-        let total_runs = num_warmups + num_runs;
+        let total_runs = num_runs;
 
         println!(
             "RUN benchmark for: num_shards {},  concurrency_level_per_shard = {}, \
@@ -145,25 +144,15 @@ where
                 account_pick_style,
             ))
         };
-        for i in 0..total_runs {
-            if i < num_warmups {
-                println!("WARMUP - ignore results");
-                runner.run_benchmark(
-                    run_par,
-                    run_seq,
-                    concurrency_level_per_shard,
-                    maybe_block_gas_limit,
-                );
-            } else {
-                let tps = runner.run_benchmark(
-                    run_par,
-                    run_seq,
-                    concurrency_level_per_shard,
-                    maybe_block_gas_limit,
-                );
-                par_tps.push(tps.0);
-                seq_tps.push(tps.1);
-            }
+        for _ in 0..total_runs {
+            let tps = runner.run_benchmark(
+                run_par,
+                run_seq,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            );
+            par_tps.push(tps.0);
+            seq_tps.push(tps.1);
         }
 
         (par_tps, seq_tps)

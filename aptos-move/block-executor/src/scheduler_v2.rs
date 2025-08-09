@@ -833,6 +833,7 @@ impl SchedulerV2 {
                     "Active",
                     "Done",
                     None,
+                    None,
                     "All transactions completed",
                 );
             }
@@ -847,6 +848,7 @@ impl SchedulerV2 {
                         "Idle",
                         "PostCommitProcessing",
                         Some(txn_idx),
+                        None,
                         "Post-commit task dispatched",
                     );
                 }
@@ -860,6 +862,7 @@ impl SchedulerV2 {
                             "Active",
                             "Halted",
                             None,
+                            None,
                             "Execution halted",
                         );
                     }
@@ -870,12 +873,27 @@ impl SchedulerV2 {
 
         if let Some(txn_idx) = self.txn_statuses.get_execution_queue_manager().pop_next() {
             if let Some(incarnation) = self.start_executing(txn_idx)? {
+                // Log task picked event using performance metric
+                if let Some(logger) = get_global_logger() {
+                    let mut data = std::collections::HashMap::new();
+                    data.insert("event_type".to_string(), "task_picked".to_string());
+                    data.insert("kind".to_string(), "Execution".to_string());
+                    data.insert("incarnation".to_string(), incarnation.to_string());
+                    logger.log_performance_metric(
+                        "task_events",
+                        1.0,
+                        Some(txn_idx),
+                        data,
+                    );
+                }
+                
                 // Log scheduler state transition for execution task
                 if let Some(logger) = get_global_logger() {
                     logger.log_scheduler_state_transition(
                         "Idle",
                         "TaskDispatched",
                         Some(txn_idx),
+                        Some(incarnation),
                         "Execution task dispatched",
                     );
                 }

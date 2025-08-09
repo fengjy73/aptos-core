@@ -6,6 +6,7 @@
 
 use crate::{
     block_stm_logger::get_global_logger,
+    counters,
     scheduler_v2::ExecutionQueueManager,
 };
 use aptos_infallible::Mutex;
@@ -129,6 +130,18 @@ pub(crate) enum SchedulingStatus {
     Executing,
     Aborted,
     Executed,
+}
+
+impl SchedulingStatus {
+    /// Convert to string representation for logging
+    pub(crate) fn as_str(&self) -> &'static str {
+        match self {
+            SchedulingStatus::PendingScheduling => "PendingScheduling",
+            SchedulingStatus::Executing => "Executing",
+            SchedulingStatus::Aborted => "Aborted",
+            SchedulingStatus::Executed => "Executed",
+        }
+    }
 }
 
 /// Represents the internal execution status of a transaction at a specific incarnation.
@@ -391,6 +404,8 @@ impl ExecutionStatuses {
                 },
             }
 
+            // Stall event is recorded through TaskKind::NextTask handling in executor
+            
             return Ok(true);
         }
         Ok(false)
@@ -406,7 +421,7 @@ impl ExecutionStatuses {
     /// - `Ok(true)` if this call changed the state from stalled to unstalled (num_stalls 1→0)
     /// - `Ok(false)` if the transaction remains stalled after this call
     /// - `Err` if there was an error removing the stall (e.g., no matching add_stall)
-    pub(crate) fn remove_stall(&self, txn_idx: TxnIndex, owner_txn: TxnIndex) -> Result<bool, PanicError> {
+    pub(crate) fn remove_stall(&self, txn_idx: TxnIndex, _owner_txn: TxnIndex) -> Result<bool, PanicError> {
         let status = &self.statuses[txn_idx as usize];
         let prev_num_stalls = status.num_stalls.fetch_sub(1, Ordering::SeqCst);
 
@@ -468,7 +483,12 @@ impl ExecutionStatuses {
         let status = &self.statuses[txn_idx as usize];
 
         let status_guard = &mut *status.status_with_incarnation.lock();
-        let old_status = format!("{:?}", status_guard.status);
+        let old_status = match status_guard.status {
+            SchedulingStatus::PendingScheduling => "PendingScheduling",
+            SchedulingStatus::Executing => "Executing",
+            SchedulingStatus::Aborted => "Aborted",
+            SchedulingStatus::Executed => "Executed",
+        };
         let ret = status_guard.start_executing();
 
         if ret.is_some() {
@@ -477,7 +497,7 @@ impl ExecutionStatuses {
                 logger.log_execution_state_transition(
                     txn_idx,
                     ret.unwrap(),
-                    &format!("{:?}", old_status),
+                    old_status,
                     "Executing",
                     "start_executing",
                     "Execute"

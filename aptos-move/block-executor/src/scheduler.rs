@@ -56,6 +56,7 @@ pub enum DependencyStatus {
     // The dependency is not resolved yet.
     Unresolved,
     // The dependency is resolved.
+    #[allow(dead_code)]
     Resolved,
     // The parallel execution is halted.
     ExecutionHalted,
@@ -75,12 +76,14 @@ pub enum DependencyResult {
 /// See explanations for the ExecutionStatus below.
 #[derive(Debug, Clone)]
 pub enum ExecutionTaskType {
+    #[allow(dead_code)]
     Execution,
     Wakeup(DependencyCondvar),
 }
 
 /// Task type that the parallel execution workers get from the scheduler.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum SchedulerTask {
     /// Execution task with a version of the transaction, and whether it's waking up an already
     /// executing worker (suspended / waiting on a dependency).
@@ -140,12 +143,16 @@ pub enum SchedulerTask {
 #[derive(Debug)]
 enum ExecutionStatus {
     Ready(Incarnation, ExecutionTaskType),
+    #[allow(dead_code)]
     Executing(Incarnation, ExecutionTaskType),
     Suspended(Incarnation, DependencyCondvar),
+    #[allow(dead_code)]
     Executed(Incarnation),
     // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
     // it gets committed later, without scheduler tracking.
+    #[allow(dead_code)]
     Committed(Incarnation),
+    #[allow(dead_code)]
     Aborting(Incarnation),
     ExecutionHalted,
 }
@@ -232,11 +239,14 @@ impl PartialEq for ExecutionStatus {
 #[derive(Debug)]
 struct ValidationStatus {
     max_triggered_wave: Wave,
+    #[allow(dead_code)]
     required_wave: Wave,
+    #[allow(dead_code)]
     maybe_max_validated_wave: Option<Wave>,
 }
 
 impl ValidationStatus {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         ValidationStatus {
             max_triggered_wave: 0,
@@ -266,6 +276,7 @@ pub struct Scheduler {
 
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
+    #[allow(dead_code)]
     commit_state: CachePadded<ExplicitSyncWrapper<(TxnIndex, Wave)>>,
 
     // Note: with each thread reading both counters when deciding the next task, and being able
@@ -297,12 +308,14 @@ pub struct Scheduler {
 
     has_halted: CachePadded<AtomicBool>,
 
+    #[allow(dead_code)]
     queueing_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
 }
 
 /// Public Interfaces for the Scheduler
+#[allow(dead_code)]
 impl Scheduler {
     pub fn new(num_txns: TxnIndex) -> Self {
         // Empty block should early return and not create a scheduler.
@@ -713,6 +726,7 @@ impl TWaitForDependency for Scheduler {
 }
 
 /// Private functions of the Scheduler
+#[allow(dead_code)]
 impl Scheduler {
     /// Helper function to be called from Scheduler::halt(); Sets the transaction status to Halted and
     /// notifies the waiting thread, if applicable. The guarantee is that if halt(txn_idx) is called,

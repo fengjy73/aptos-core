@@ -3152,6 +3152,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "tempfile",
  "test-case",
 ]
 
@@ -4439,6 +4440,8 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "serde_json",
+ "sha2 0.9.9",
 ]
 
 [[package]]

@@ -49,9 +49,6 @@ struct ReplayERC20HistoricOpt{
     #[clap(long)]
     pub skip_sequential: bool,
 
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
-
     #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
@@ -73,9 +70,6 @@ struct ReplayERC20HistoricOpt{
 
 #[derive(Debug, Parser)]
 struct ReplayERC20FullOpt{
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
-
     #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
@@ -94,9 +88,6 @@ struct ReplayERC20FullOpt{
 
 #[derive(Debug, Parser)]
 struct CommonOpt{
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
-    
     #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
@@ -109,9 +100,6 @@ struct CommonOpt{
 
 #[derive(Debug, Parser)]
 struct CommonShardingOpt{
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
-    
     #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
@@ -140,9 +128,6 @@ struct ParamSweepOpt {
     #[clap(long)]
     pub skip_sequential: bool,
 
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
-
     #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
@@ -154,9 +139,6 @@ struct ParamSweepOpt {
 struct ExecuteOpt {
     #[clap(long, default_value_t = 1000)]
     pub num_accounts: usize,
-
-    #[clap(long, default_value_t = 0)]
-    pub num_warmups: usize,
 
     #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
@@ -209,11 +191,30 @@ fn replay_erc20_historic(opt: ReplayERC20HistoricOpt) -> Result<(), Box<dyn Erro
     };
     
     let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
+    
+    // 根据concurrency_level自动决定执行模式：
+    // concurrency_level = 1: 只执行串行
+    // concurrency_level > 1: 只执行并行
+    let run_parallel = if opt.skip_parallel {
+        false
+    } else if concurrency_level == 1 {
+        false  // concurrency=1时不运行并行
+    } else {
+        true   // concurrency>1时运行并行
+    };
+    
+    let run_sequential = if opt.skip_sequential {
+        false
+    } else if concurrency_level == 1 {
+        true   // concurrency=1时只运行串行
+    } else {
+        false  // concurrency>1时不运行串行
+    };
+    
     let result = simulator.replay_erc20_historic(
         opt.data_path,
-        !opt.skip_parallel,
-        !opt.skip_sequential,
-        opt.num_warmups,
+        run_parallel,
+        run_sequential,
         opt.num_runs,
         opt.maybe_block_gas_limit,
         concurrency_level,
@@ -263,7 +264,6 @@ fn replay_erc20_full(opt: ReplayERC20FullOpt) -> Result<(), Box<dyn Error>> {
     let metrics_results = simulator.replay_with_full_logging(
         &opt.data_path,
         concurrency_level,
-        opt.num_warmups,
         opt.num_runs,
     )?;
     
@@ -275,8 +275,8 @@ fn replay_erc20_full(opt: ReplayERC20FullOpt) -> Result<(), Box<dyn Error>> {
             metrics.tps,
             metrics.execution_time_ms,
             metrics.abort_count,
-            metrics.suspend_count,
-            metrics.avg_suspend_time_us
+            metrics.stall_count,
+            metrics.avg_stall_time_us
         );
     }
     
@@ -294,8 +294,8 @@ fn replay_erc20_full(opt: ReplayERC20FullOpt) -> Result<(), Box<dyn Error>> {
                 metrics.tps,
                 metrics.execution_time_ms,
                 metrics.abort_count,
-                metrics.suspend_count,
-                metrics.avg_suspend_time_us
+                metrics.stall_count,
+                metrics.avg_stall_time_us
             )?;
         }
         println!("Results written to: {}", output_path);
@@ -332,7 +332,6 @@ fn param_sweep(opt: ParamSweepOpt) {
                 *block_size,
                 run_parallel,
                 run_sequential,
-                opt.num_warmups,
                 opt.num_runs,
                 1,
                 concurrency_level,
@@ -396,7 +395,6 @@ fn execute(opt: ExecuteOpt) {
         opt.block_size,
         true,
         false,
-        opt.num_warmups,
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::sync::Arc;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -74,9 +74,9 @@ pub struct DetailedExecutionMetrics {
     pub execution_count: u64,
     pub validation_count: u64,
     pub abort_count: u64,
-    pub suspend_count: u64,
-    pub avg_suspend_time_us: f64,
-    pub total_suspend_time_us: f64,
+    pub stall_count: u64,
+    pub avg_stall_time_us: f64,
+    pub total_stall_time_us: f64,
     pub execution_time_ms: u128,
     pub tps: usize,
 }
@@ -85,7 +85,7 @@ pub struct Simulator{
     account_universe: AccountUniverse,
     executor: FakeExecutor,
     // 新增：日志相关字段
-    logger: Option<Arc<BlockSTMLogger>>,
+    _logger: Option<Arc<BlockSTMLogger>>,
     log_enabled: bool,
     csv_data: Option<Vec<TransactionData>>,
     current_block_id: u64,
@@ -114,7 +114,7 @@ impl Simulator{
         Self {
             account_universe: universe,
             executor,
-            logger: None,
+            _logger: None,
             log_enabled: false,
             csv_data: None,
             current_block_id: 0,
@@ -147,7 +147,7 @@ impl Simulator{
         Self {
             account_universe: universe,
             executor,
-            logger: None,
+            _logger: None,
             log_enabled: enable_logging,
             csv_data: None,
             current_block_id: 0,
@@ -183,10 +183,12 @@ impl Simulator{
         Ok(())
     }
 
-    // 新增：加载CSV数据
+    // 新增：加载CSV数据并生成完整映射
     pub fn load_csv_data(&mut self, csv_path: &str) -> Result<Vec<(usize, usize)>, Box<dyn std::error::Error>> {
         use std::fs::File;
         use std::io::{BufRead, BufReader};
+        use std::collections::HashMap;
+        use sha2::{Sha256, Digest};
         
         println!("Loading CSV data from: {}", csv_path);
         
@@ -194,6 +196,8 @@ impl Simulator{
         let reader = BufReader::new(file);
         let mut transaction_graph = Vec::new();
         let mut csv_data = Vec::new();
+        let mut account_id_map = HashMap::new();
+        let mut next_account_id = 1u64;
         
         // Skip header line and parse CSV
         for (line_num, line) in reader.lines().enumerate() {
@@ -203,6 +207,35 @@ impl Simulator{
             if parts.len() >= 3 {
                 if let (Ok(from), Ok(to)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
                     transaction_graph.push((from, to));
+                    
+                    let from_raw = format!("{}", from);
+                    let to_raw = format!("{}", to);
+                    let value_raw = parts.get(2).unwrap_or(&"1").to_string();
+                    
+                    // 规范化地址（小写、去空格）
+                    let from_norm = from_raw.trim().to_lowercase();
+                    let to_norm = to_raw.trim().to_lowercase();
+                    
+                    // 分配account_id
+                    let from_account_id = *account_id_map.entry(from_norm.clone()).or_insert_with(|| {
+                        let id = next_account_id;
+                        next_account_id += 1;
+                        id
+                    });
+                    let to_account_id = *account_id_map.entry(to_norm.clone()).or_insert_with(|| {
+                        let id = next_account_id;
+                        next_account_id += 1;
+                        id
+                    });
+                    
+                    // FungibleStore键ID（假设与account_id相同）
+                    let _key_from_id = from_account_id;
+                    let _key_to_id = to_account_id;
+                    
+                    // 计算行哈希
+                    let mut hasher = Sha256::new();
+                    hasher.update(format!("{}|{}|{}", from_raw, to_raw, value_raw));
+                    let _row_hash = format!("{:x}", hasher.finalize());
                     
                     // Store CSV data for mapping
                     let transaction_data = TransactionData {
@@ -218,9 +251,212 @@ impl Simulator{
             }
         }
         
+        // 生成row_tx_mapping.csv文件
+        if self.log_enabled {
+            self.generate_row_tx_mapping(csv_path, &csv_data, &account_id_map)?;
+        }
+        
         self.csv_data = Some(csv_data);
         println!("Loaded {} transactions from CSV", transaction_graph.len());
         Ok(transaction_graph)
+    }
+    
+    // 新增：生成row_tx_mapping.csv文件
+    fn generate_row_tx_mapping(
+        &self, 
+        csv_path: &str, 
+        csv_data: &[TransactionData],
+        account_id_map: &HashMap<String, u64>
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::io::Write;
+        use sha2::{Sha256, Digest};
+        
+        let default_log_dir = "./logs".to_string();
+        let log_dir = self.log_output_dir.as_ref().unwrap_or(&default_log_dir);
+        let block_dir = format!("{}/block_{:03}", log_dir, self.current_block_id);
+        std::fs::create_dir_all(&block_dir)?;
+        
+        let mapping_path = format!("{}/row_tx_mapping.csv", block_dir);
+        let mut mapping_file = File::create(&mapping_path)?;
+        
+        // 提取数据集名称
+        let dataset = if csv_path.contains("ETH") {
+            "ETH"
+        } else if csv_path.contains("USDT") {
+            "USDT"
+        } else {
+            "UNKNOWN"
+        };
+        
+        // 写入CSV头部（17字段完整版）
+        writeln!(mapping_file, "block_id,dataset,source_csv,row_number,tx_index,from_raw,to_raw,value_raw,from_norm,to_norm,from_account_id,to_account_id,key_from_id,key_to_id,included,skip_reason,row_hash")?;
+        
+        // 为每个交易写入映射记录
+        for (idx, transaction_data) in csv_data.iter().enumerate() {
+            let from_raw = transaction_data.from_address.replace("account_", "");
+            let to_raw = transaction_data.to_address.replace("account_", "");
+            let value_raw = transaction_data.amount.to_string();
+            
+            // 规范化地址
+            let from_norm = from_raw.trim().to_lowercase();
+            let to_norm = to_raw.trim().to_lowercase();
+            
+            // 获取account_id
+            let from_account_id = account_id_map.get(&from_norm).copied().unwrap_or(0);
+            let to_account_id = account_id_map.get(&to_norm).copied().unwrap_or(0);
+            
+            // FungibleStore键ID（假设与account_id相同）
+            let key_from_id = from_account_id;
+            let key_to_id = to_account_id;
+            
+            // 计算行哈希
+            let mut hasher = Sha256::new();
+            hasher.update(format!("{}|{}|{}", from_raw, to_raw, value_raw));
+            let row_hash = format!("{:x}", hasher.finalize());
+            
+            writeln!(mapping_file, 
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                format!("block_{:03}", self.current_block_id), // block_id
+                dataset, // dataset
+                csv_path, // source_csv
+                transaction_data.transaction_index + 1, // row_number (1开始)
+                idx + 1, // tx_index (1开始)
+                from_raw, // from_raw
+                to_raw, // to_raw
+                value_raw, // value_raw
+                from_norm, // from_norm
+                to_norm, // to_norm
+                from_account_id, // from_account_id
+                to_account_id, // to_account_id
+                key_from_id, // key_from_id
+                key_to_id, // key_to_id
+                "true", // included
+                "", // skip_reason
+                row_hash // row_hash
+            )?;
+        }
+        
+        println!("Generated row_tx_mapping.csv with {} entries at {}", csv_data.len(), mapping_path);
+        
+        // Generate additional files in the block directory
+        self.generate_code_map(&block_dir)?;
+        self.generate_meta_json(&block_dir, csv_path, csv_data.len())?;
+        
+        Ok(())
+    }
+
+    /// Generate code_map.json with source code locations
+    fn generate_code_map(&self, block_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::io::Write;
+        use serde_json::json;
+
+        let code_map_path = format!("{}/code_map.json", block_dir);
+        let mut code_map_file = File::create(&code_map_path)?;
+
+        let code_map = json!({
+            "parallel_execute_entry": "aptos-move/block-executor/src/executor.rs:450",
+            "exec_task_loop": "aptos-move/block-executor/src/executor.rs:520",
+            "val_task_loop": "aptos-move/block-executor/src/executor.rs:580",
+            "suspend_branch": "aptos-move/block-executor/src/executor.rs:600",
+            "validate_fail_branch": "aptos-move/block-executor/src/scheduler_v2.rs:250",
+            "mv_store_read": "aptos-move/mvhashmap/src/versioned_data.rs:300",
+            "mv_store_write": "aptos-move/mvhashmap/src/versioned_data.rs:400",
+            "mark_estimate_sites": "aptos-move/mvhashmap/src/versioned_data.rs:720",
+            "clear_estimate_on_fail": "aptos-move/mvhashmap/src/versioned_data.rs:800",
+            "exec_index_atom": "aptos-move/block-executor/src/scheduler_v2.rs:64",
+            "val_index_atom": "aptos-move/block-executor/src/scheduler_v2.rs:68",
+            "commit_gate_check": "aptos-move/block-executor/src/scheduler_v2.rs:55",
+            "scheduler_state_enum": "aptos-move/block-executor/src/scheduler_status.rs:50",
+            "dependency_condvar": "aptos-move/block-executor/src/scheduler.rs:63",
+            "estimate_flag_const": "aptos-move/mvhashmap/src/versioned_data.rs:31",
+            "transaction_output_trait": "aptos-move/block-executor/src/task.rs:100",
+            "execution_status_enum": "aptos-move/block-executor/src/task.rs:35",
+            "notes": "FLAG_ESTIMATE=true表示推测版本；SchedulerV2使用SchedulingStatus枚举；MVDataError::Dependency触发依赖等待；incarnation从1开始递增；TransactionOutput trait提供所有输出详情字段"
+        });
+
+        writeln!(code_map_file, "{}", serde_json::to_string_pretty(&code_map)?)?;
+        println!("Generated code_map.json at {}", code_map_path);
+        Ok(())
+    }
+
+    /// Generate meta.json with run parameters and environment info
+    fn generate_meta_json(
+        &self,
+        block_dir: &str,
+        csv_path: &str,
+        tx_count: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::io::Write;
+        use serde_json::json;
+
+        let meta_path = format!("{}/meta.json", block_dir);
+        let mut meta_file = File::create(&meta_path)?;
+
+        let dataset = if csv_path.contains("ETH") {
+            "ETH"
+        } else if csv_path.contains("USDT") {
+            "USDT"
+        } else {
+            "UNKNOWN"
+        };
+
+        let git_commit = std::env::var("GIT_COMMIT")
+            .or_else(|_| {
+                std::process::Command::new("git")
+                    .args(&["rev-parse", "--short", "HEAD"])
+                    .output()
+                    .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+                    .map_err(|_| std::env::VarError::NotPresent)
+            })
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        let build_profile = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        };
+
+        let meta = json!({
+            "block_id": format!("block_{:03}", self.current_block_id),
+            "dataset": dataset,
+            "source_csv": csv_path,
+            "tx_count": tx_count,
+            "concurrency_level": num_cpus::get(),
+            "sample_period_ms": std::env::var("SAMPLE_PERIOD_MS")
+                .unwrap_or_else(|_| "50".to_string())
+                .parse::<u32>()
+                .unwrap_or(50),
+            "read_sample_rate": std::env::var("READ_SAMPLE_RATE")
+                .unwrap_or_else(|_| "0.01".to_string())
+                .parse::<f64>()
+                .unwrap_or(0.01),
+            "git_commit": git_commit,
+            "build_profile": build_profile,
+            "log_output_dir": self.log_output_dir.as_ref().unwrap_or(&"./logs".to_string()),
+            "timestamp": SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            "address_mapping_summary": {
+                "unique_accounts": tx_count * 2, // 估计值，每个交易有from和to
+                "fungible_store_keys": tx_count * 2,
+                "normalization_applied": true
+            },
+            "environment": {
+                "rust_version": std::env::var("RUSTC_VERSION").unwrap_or_else(|_| "unknown".to_string()),
+                "aptos_core_version": env!("CARGO_PKG_VERSION"),
+                "host_os": std::env::consts::OS,
+                "host_arch": std::env::consts::ARCH,
+                "cpu_count": num_cpus::get()
+            }
+        });
+
+        writeln!(meta_file, "{}", serde_json::to_string_pretty(&meta)?)?;
+        println!("Generated meta.json at {}", meta_path);
+        Ok(())
     }
 
     // 新增：处理交易映射
@@ -232,15 +468,21 @@ impl Simulator{
         if let Some(ref csv_data) = self.csv_data {
             for (block_stm_index, csv_record) in csv_data.iter().enumerate() {
                 if block_stm_index < transactions.len() {
-                     // 使用日志宏记录交易映射关系
-                     aptos_block_executor::log_transaction_mapping!(
-                         block_stm_index as u32,
-                         csv_record.transaction_index,
-                         self.current_block_id,
-                         "CSV_to_BlockSTM",
-                         &csv_record.transaction_hash,
-                         &format!("BlockSTM_{}", block_stm_index)
-                     );
+                     // 记录交易映射关系
+                     if let Some(logger) = aptos_block_executor::block_stm_logger::get_global_logger() {
+                         logger.log_performance_metric(
+                             "transaction_mapping",
+                             block_stm_index as f64,
+                             Some(block_stm_index as u32),
+                             std::collections::HashMap::from([
+                                 ("csv_index".to_string(), csv_record.transaction_index.to_string()),
+                                 ("block_id".to_string(), self.current_block_id.to_string()),
+                                 ("mapping_type".to_string(), "CSV_to_BlockSTM".to_string()),
+                                 ("transaction_hash".to_string(), csv_record.transaction_hash.clone()),
+                                 ("block_stm_index".to_string(), block_stm_index.to_string()),
+                             ])
+                         );
+                     }
                  }
             }
         }
@@ -328,14 +570,22 @@ impl Simulator{
         
         for (block_stm_index, csv_record) in csv_records.iter().enumerate() {
             if block_stm_index < transactions.len() {
-                aptos_block_executor::log_transaction_mapping!(
-                    block_stm_index as u32,
-                    csv_record.csv_index,
-                    self.current_block_id,
-                    &csv_record.transaction_hash,
-                    &csv_record.sender_address,
-                    "0" // sequence_number，这里简化处理
-                );
+                // 记录详细交易映射
+                if let Some(logger) = aptos_block_executor::block_stm_logger::get_global_logger() {
+                    logger.log_performance_metric(
+                        "detailed_transaction_mapping",
+                        block_stm_index as f64,
+                        Some(block_stm_index as u32),
+                        std::collections::HashMap::from([
+                            ("csv_index".to_string(), csv_record.csv_index.to_string()),
+                            ("block_id".to_string(), self.current_block_id.to_string()),
+                            ("transaction_hash".to_string(), csv_record.transaction_hash.clone()),
+                            ("sender_address".to_string(), csv_record.sender_address.clone()),
+                            ("receiver_address".to_string(), csv_record.receiver_address.clone()),
+                            ("amount".to_string(), csv_record.amount.to_string()),
+                        ])
+                    );
+                }
             }
         }
     }
@@ -452,21 +702,21 @@ impl Simulator{
         let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
         let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
         let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
-        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
-        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - _suspend_time_before;
-        let avg_suspend_time = if suspend > 0 {
-            suspend_time_total / suspend as f64
+        let stall = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let stall_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - _suspend_time_before;
+        let avg_stall_time = if stall > 0 {
+            stall_time_total / stall as f64
         } else {
             0.0
         };
         
-        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+        println!("execution_total:{}, validation_total:{}, abort:{}, stall:{}, avg_stall_time:{:.2} us, stall_time_total:{:.2} us", 
             execution_total,
             validation_total,
             abort,
-            suspend,
-            avg_suspend_time * 1000000.0,
-            suspend_time_total * 1000000.0
+            stall,
+            avg_stall_time * 1000000.0,
+            stall_time_total * 1000000.0
         );
         (output, block_size * 1000 / exec_time as usize)
     }
@@ -544,10 +794,10 @@ impl Simulator{
         let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
         let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
         let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
-        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
-        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - _suspend_time_before;
-        let avg_suspend_time = if suspend > 0 {
-            suspend_time_total / suspend as f64
+        let stall = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let stall_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - _suspend_time_before;
+        let avg_stall_time = if stall > 0 {
+            stall_time_total / stall as f64
         } else {
             0.0
         };
@@ -563,13 +813,13 @@ impl Simulator{
                     self.current_block_id, block_size, tps, successful_txns, aborted_txns);
         }
         
-        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+        println!("execution_total:{}, validation_total:{}, abort:{}, stall:{}, avg_stall_time:{:.2} us, stall_time_total:{:.2} us", 
             execution_total,
             validation_total,
             abort,
-            suspend,
-            avg_suspend_time * 1000000.0,
-            suspend_time_total * 1000000.0
+            stall,
+            avg_stall_time * 1000000.0,
+            stall_time_total * 1000000.0
         );
         (output, tps)
     }
@@ -627,10 +877,10 @@ impl Simulator{
         let execution_total = counters::TASK_EXECUTE_SECONDS.get_sample_count() - execution_before;
         let validation_total = counters::TASK_VALIDATE_SECONDS.get_sample_count() - validation_before;
         let abort = counters::SPECULATIVE_ABORT_COUNT.get() - abort_before;
-        let suspend = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
-        let suspend_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - suspend_time_before;
-        let avg_suspend_time = if suspend > 0 {
-            suspend_time_total / suspend as f64
+        let stall = counters::DEPENDENCY_WAIT_SECONDS.get_sample_count() - suspend_before;
+        let stall_time_total = counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum() - suspend_time_before;
+        let avg_stall_time = if stall > 0 {
+            stall_time_total / stall as f64
         } else {
             0.0
         };
@@ -650,20 +900,20 @@ impl Simulator{
             execution_count: execution_total,
             validation_count: validation_total,
             abort_count: abort,
-            suspend_count: suspend,
-            avg_suspend_time_us: avg_suspend_time * 1000000.0,
-            total_suspend_time_us: suspend_time_total * 1000000.0,
+            stall_count: stall,
+            avg_stall_time_us: avg_stall_time * 1000000.0,
+            total_stall_time_us: stall_time_total * 1000000.0,
             execution_time_ms: exec_time,
             tps,
         };
         
-        println!("execution_total:{}, validation_total:{}, abort:{}, suspend:{}, avg_suspend_time:{:.2} us, suspend_time_total:{:.2} us", 
+        println!("execution_total:{}, validation_total:{}, abort:{}, stall:{}, avg_stall_time:{:.2} us, stall_time_total:{:.2} us", 
             execution_total,
             validation_total,
             abort,
-            suspend,
-            avg_suspend_time * 1000000.0,
-            suspend_time_total * 1000000.0
+            stall,
+            avg_stall_time * 1000000.0,
+            stall_time_total * 1000000.0
         );
         
         (output, metrics)
@@ -1081,7 +1331,6 @@ impl Simulator{
         data_path: String,
         skip_parallel: bool,
         skip_sequential: bool,
-        num_warmups: usize,
         num_runs: usize,
         maybe_block_gas_limit: Option<u64>,
         concurrency_level: usize,
@@ -1112,19 +1361,7 @@ impl Simulator{
                     self.current_block_id, transactions.len(), concurrency_level);
         }
         
-        // Run warmups
-        for i in 0..num_warmups {
-            println!("Warmup run {}/{}", i + 1, num_warmups);
-            let _ = self.execute_blockstm_benchmark(
-                transactions.clone(),
-                skip_parallel,  // run_par: directly use skip_parallel (already negated in main.rs)
-                skip_sequential, // run_seq: directly use skip_sequential (already negated in main.rs)
-                concurrency_level,
-                maybe_block_gas_limit,
-            );
-        }
-        
-        // Run actual benchmarks
+        // Run benchmarks
         for i in 0..num_runs {
             println!("Benchmark run {}/{}", i + 1, num_runs);
             let (_par_tps, _seq_tps) = self.execute_blockstm_benchmark(
@@ -1151,7 +1388,6 @@ impl Simulator{
         &mut self,
         data_path: &str,
         concurrency_level: usize,
-        num_warmups: usize,
         num_runs: usize,
     ) -> Result<Vec<DetailedExecutionMetrics>, Box<dyn std::error::Error>> {
         // 强制启用日志记录
@@ -1185,19 +1421,6 @@ impl Simulator{
         
         let mut metrics_results = Vec::new();
         
-        // 热身运行
-        for warmup_idx in 0..num_warmups {
-            println!("Block {} Start Warmup_{} with {} transactions at concurrency {}", 
-                self.current_block_id, warmup_idx, transactions.len(), concurrency_level);
-            let (_, metrics) = self.execute_benchmark_parallel_with_metrics(
-                &transactions,
-                concurrency_level,
-                None,
-            );
-            println!("Block {} End Warmup_{} with {} transactions, TPS: {}", 
-                self.current_block_id, warmup_idx, transactions.len(), metrics.tps);
-        }
-        
         // 基准测试运行
         for run_idx in 0..num_runs {
             println!("Block {} Start Benchmark_Run_{} with {} transactions at concurrency {}", 
@@ -1224,7 +1447,7 @@ impl Simulator{
                         ("successful_count".to_string(), successful_count.to_string()),
                         ("failed_count".to_string(), failed_count.to_string()),
                         ("abort_count".to_string(), metrics.abort_count.to_string()),
-                        ("suspend_count".to_string(), metrics.suspend_count.to_string())
+                        ("stall_count".to_string(), metrics.stall_count.to_string())
                     ])
                 );
             }

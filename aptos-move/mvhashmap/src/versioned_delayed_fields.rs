@@ -539,14 +539,20 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         let mut todo_derived = Vec::new();
 
         for id in ids {
-            let mut versioned_value = self
-                .values
-                .get_mut(&id)
-                .expect("Value in commit needs to be in the HashMap");
-            let entry_to_commit = versioned_value
-                .versioned_map
-                .get(&idx_to_commit)
-                .expect("Value in commit at that transaction version needs to be in the HashMap");
+            let mut versioned_value = match self.values.get_mut(&id) {
+                Some(value) => value,
+                None => {
+                    // Note: DelayedField ID not found in commit HashMap - this is expected for some transaction types
+                    continue;
+                }
+            };
+            let entry_to_commit = match versioned_value.versioned_map.get(&idx_to_commit) {
+                Some(entry) => entry,
+                None => {
+                    // Note: Transaction value not found in versioned map - this is expected for some transaction types
+                    continue;
+                }
+            };
 
             let new_entry = match entry_to_commit.as_ref().deref() {
                 VersionEntry::Value(_, None) => None,

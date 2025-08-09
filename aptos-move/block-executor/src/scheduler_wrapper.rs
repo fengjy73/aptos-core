@@ -17,6 +17,7 @@ pub(crate) enum SchedulerWrapper<'a> {
     // a different validation logic, and does not require this flag. The flag is
     // stored in SchedulerWrapper only for a write (it's never read), to simplify
     // the implementation in executor.rs and avoid passing atomic booleans.
+    #[allow(dead_code)]
     V1(&'a Scheduler, &'a AtomicBool),
     V2(&'a SchedulerV2),
 }
