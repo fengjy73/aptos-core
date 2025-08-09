@@ -680,6 +680,7 @@ impl Simulator{
         
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                blockstm_v2: true,
                 concurrency_level: 1,
                 allow_fallback: true,
                 discard_failed_blocks: false,
@@ -772,6 +773,7 @@ impl Simulator{
         
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                blockstm_v2: true,
                 concurrency_level: concurrency_level_per_shard,
                 allow_fallback: true,
                 discard_failed_blocks: false,
@@ -855,6 +857,7 @@ impl Simulator{
         
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                blockstm_v2: true,
                 concurrency_level: concurrency_level_per_shard,
                 allow_fallback: true,
                 discard_failed_blocks: false,
