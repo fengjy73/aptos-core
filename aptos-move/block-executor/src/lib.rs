@@ -136,6 +136,7 @@ and threads that perform these tasks can already detect validation failures
 due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
 **/
+pub mod block_stm_logger;
 mod captured_reads;
 mod code_cache;
 pub mod code_cache_global;
@@ -160,5 +161,7 @@ pub mod txn_provider;
 pub mod types;
 #[cfg(test)]
 mod unit_tests;
+#[cfg(test)]
+mod block_stm_logger_test;
 mod value_exchange;
 pub mod view;

@@ -124,7 +124,7 @@ gas-profiling
 # replay-verify and module-verify script outputs
 metadata-cache
 /local/
-run_*
+# run_*
 
 # test files for indexer GRPC
 test_indexer_grpc_*.yaml
@@ -147,3 +147,7 @@ genesis_antithesis_*/
 
 # Ignore generated credentials from google-github-actions/auth
 gha-creds-*.json
+
+# Block-STM Logger test log files
+aptos-move/aptos-transaction-benchmarks/batch_logs/
+aptos-move/aptos-transaction-benchmarks/test_logs*/

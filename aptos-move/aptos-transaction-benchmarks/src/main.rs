@@ -7,12 +7,13 @@ use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
+use aptos_transaction_benchmarks::simulator::Simulator;
+
 use aptos_vm_logging::disable_speculative_logging;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
 use std::{
-    net::SocketAddr,
-    time::{SystemTime, UNIX_EPOCH},
+    error::Error, fs, io::Write, net::SocketAddr, path::Path, time::{SystemTime, UNIX_EPOCH}
 };
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
@@ -30,11 +31,92 @@ struct Args {
 enum BenchmarkCommand {
     ParamSweep(ParamSweepOpt),
     Execute(ExecuteOpt),
+    ReplayERC20(ReplayERC20HistoricOpt),
+    ReplayERC20Full(ReplayERC20FullOpt),
+    Airdrop(CommonOpt),
+    Ballot(CommonOpt),
+    BallotSharding(CommonShardingOpt),
+    Kitty(CommonOpt),
+    MillionPixel(CommonOpt),
+    Empty(CommonOpt),
 }
 
 #[derive(Debug, Parser)]
+struct ReplayERC20HistoricOpt{
+    #[clap(long)]
+    pub skip_parallel: bool,
+
+    #[clap(long)]
+    pub skip_sequential: bool,
+
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long)]
+    pub maybe_block_gas_limit: Option<u64>,
+
+    #[clap(long, default_value="../data/USDT_240101_240331_data_100000.csv")]
+    pub data_path:String,
+
+    #[clap(long,default_value_t=93000)]
+    pub num_accounts:usize,
+
+    #[clap(long)]
+    pub output_file: Option<String>,
+
+    #[clap(long)]
+    pub concurrency_level: Option<usize>,
+}
+
+#[derive(Debug, Parser)]
+struct ReplayERC20FullOpt{
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long, default_value="data/ETH_2401_100000.csv")]
+    pub data_path: String,
+
+    #[clap(long, default_value_t=93000)]
+    pub num_accounts: usize,
+
+    #[clap(long)]
+    pub output_file: Option<String>,
+
+    #[clap(long)]
+    pub concurrency_level: Option<usize>,
+}
+
+#[derive(Debug, Parser)]
+struct CommonOpt{
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long,default_value_t = 1000)]
+    pub num_accounts: usize,
+
+    #[clap(long,default_value_t = 100000)]
+    pub num_transactions: usize,
+}
+
+#[derive(Debug, Parser)]
+struct CommonShardingOpt{
+    #[clap(long, default_value_t = 1)]
+    pub num_runs: usize,
+
+    #[clap(long,default_value_t = 1000)]
+    pub num_accounts: usize,
+
+    #[clap(long,default_value_t = 100000)]
+    pub num_transactions: usize,
+
+    #[clap(long,default_value_t = 1)]
+    pub num_shardings: usize,
+}
+
+
+#[derive(Debug, Parser)]
 struct ParamSweepOpt {
-    #[clap(long, default_value = "200000")]
+    #[clap(long, default_value = "1000")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
@@ -46,10 +128,7 @@ struct ParamSweepOpt {
     #[clap(long)]
     pub skip_sequential: bool,
 
-    #[clap(long, default_value_t = 2)]
-    pub num_warmups: usize,
-
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 1)]
     pub num_runs: usize,
 
     #[clap(long)]
@@ -58,13 +137,10 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value_t = 100000)]
+    #[clap(long, default_value_t = 1000)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value_t = 5)]
-    pub num_warmups: usize,
-
-    #[clap(long, default_value_t = 10000)]
+    #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
 
     #[clap(long, default_value_t = 15)]
@@ -87,6 +163,145 @@ struct ExecuteOpt {
 
     #[clap(long, default_value_t = false)]
     pub generate_then_execute: bool,
+}
+
+fn replay_erc20_historic(opt: ReplayERC20HistoricOpt) -> Result<(), Box<dyn Error>> {
+    // 如果指定了输出文件，确保目录存在
+    if let Some(ref output_path) = opt.output_file {
+        if let Some(parent_dir) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent_dir)?;
+        }
+    }
+
+    // 检查是否启用日志功能
+    let log_enabled = std::env::var("BLOCK_STM_LOG_LEVEL").is_ok();
+    let log_output_dir = std::env::var("BLOCK_STM_LOG_DIR").ok();
+    
+    // 使用新的支持日志功能的构造函数
+    let mut simulator = if log_enabled {
+        println!("Creating Simulator with logging enabled, output dir: {:?}", log_output_dir);
+        Simulator::new_with_logging(
+            opt.num_accounts,
+            true,
+            log_output_dir,
+        )
+    } else {
+        println!("Creating Simulator without logging");
+        Simulator::with_account_nums(opt.num_accounts)
+    };
+    
+    let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
+    
+    // 根据concurrency_level自动决定执行模式：
+    // concurrency_level = 1: 只执行串行
+    // concurrency_level > 1: 只执行并行
+    let run_parallel = if opt.skip_parallel {
+        false
+    } else if concurrency_level == 1 {
+        false  // concurrency=1时不运行并行
+    } else {
+        true   // concurrency>1时运行并行
+    };
+    
+    let run_sequential = if opt.skip_sequential {
+        false
+    } else if concurrency_level == 1 {
+        true   // concurrency=1时只运行串行
+    } else {
+        false  // concurrency>1时不运行串行
+    };
+    
+    let result = simulator.replay_erc20_historic(
+        opt.data_path,
+        run_parallel,
+        run_sequential,
+        opt.num_runs,
+        opt.maybe_block_gas_limit,
+        concurrency_level,
+    );
+    
+    match result {
+        Ok(_) => println!("ERC20 historic replay completed successfully"),
+        Err(e) => println!("Error during ERC20 historic replay: {}", e),
+    }
+
+    // 如果指定了输出文件，将结果写入文件
+    if let Some(output_path) = opt.output_file {
+        let mut file = fs::File::create(&output_path)?;
+        writeln!(file, "Replay ERC20 Historic benchmark completed successfully")?;
+        println!("Results written to: {}", output_path);
+    }
+
+    Ok(())
+}
+
+fn replay_erc20_full(opt: ReplayERC20FullOpt) -> Result<(), Box<dyn Error>> {
+    // 如果指定了输出文件，确保目录存在
+    if let Some(ref output_path) = opt.output_file {
+        if let Some(parent_dir) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent_dir)?;
+        }
+    }
+
+    // 强制启用日志功能
+    std::env::set_var("BLOCK_STM_LOG_LEVEL", "DEBUG");
+    if std::env::var("BLOCK_STM_LOG_DIR").is_err() {
+        std::env::set_var("BLOCK_STM_LOG_DIR", "./test_logs_stage4_full");
+    }
+    
+    let log_output_dir = std::env::var("BLOCK_STM_LOG_DIR").ok();
+    
+    println!("Creating Simulator with full logging enabled, output dir: {:?}", log_output_dir);
+    let mut simulator = Simulator::new_with_logging(
+        opt.num_accounts,
+        true,
+        log_output_dir,
+    );
+    
+    let concurrency_level = opt.concurrency_level.unwrap_or_else(|| num_cpus::get());
+    
+    println!("Starting full CSV replay with detailed logging...");
+    let metrics_results = simulator.replay_with_full_logging(
+        &opt.data_path,
+        concurrency_level,
+        opt.num_runs,
+    )?;
+    
+    // 输出详细的执行指标
+    println!("\n=== Full CSV Replay Results ===");
+    for (i, metrics) in metrics_results.iter().enumerate() {
+        println!("Run {}: TPS={}, Execution={}ms, Aborts={}, Suspends={}, Avg Suspend Time={:.2}us",
+            i + 1,
+            metrics.tps,
+            metrics.execution_time_ms,
+            metrics.abort_count,
+            metrics.stall_count,
+            metrics.avg_stall_time_us
+        );
+    }
+    
+    let avg_tps = metrics_results.iter().map(|m| m.tps).sum::<usize>() / metrics_results.len();
+    println!("Average TPS: {}", avg_tps);
+    
+    // 如果指定了输出文件，将结果写入文件
+    if let Some(output_path) = opt.output_file {
+        let mut file = fs::File::create(&output_path)?;
+        writeln!(file, "Full CSV Replay benchmark completed successfully")?;
+        writeln!(file, "Average TPS: {}", avg_tps)?;
+        for (i, metrics) in metrics_results.iter().enumerate() {
+            writeln!(file, "Run {}: TPS={}, Execution={}ms, Aborts={}, Suspends={}, Avg Suspend Time={:.2}us",
+                i + 1,
+                metrics.tps,
+                metrics.execution_time_ms,
+                metrics.abort_count,
+                metrics.stall_count,
+                metrics.avg_stall_time_us
+            )?;
+        }
+        println!("Results written to: {}", output_path);
+    }
+
+    Ok(())
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -117,7 +332,6 @@ fn param_sweep(opt: ParamSweepOpt) {
                 *block_size,
                 run_parallel,
                 run_sequential,
-                opt.num_warmups,
                 opt.num_runs,
                 1,
                 concurrency_level,
@@ -181,7 +395,6 @@ fn execute(opt: ExecuteOpt) {
         opt.block_size,
         true,
         false,
-        opt.num_warmups,
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
@@ -211,6 +424,40 @@ fn main() {
     match args.command {
         BenchmarkCommand::ParamSweep(opt) => param_sweep(opt),
         BenchmarkCommand::Execute(opt) => execute(opt),
+        BenchmarkCommand::ReplayERC20(opt) => {
+            if let Err(e) = replay_erc20_historic(opt) {
+                eprintln!("Error in replay_erc20_historic: {}", e);
+            }
+        },
+        BenchmarkCommand::ReplayERC20Full(opt) => {
+            if let Err(e) = replay_erc20_full(opt) {
+                eprintln!("Error in replay_erc20_full: {}", e);
+            }
+        },
+        BenchmarkCommand::Airdrop(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_airdrop(opt.num_transactions);
+        },
+        BenchmarkCommand::Ballot(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_ballot(opt.num_transactions);
+        },
+        BenchmarkCommand::BallotSharding(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_ballot_sharding(opt.num_transactions, opt.num_shardings);
+        },
+        BenchmarkCommand::Kitty(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_kitty(opt.num_transactions);
+        },
+        BenchmarkCommand::MillionPixel(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_mp(opt.num_transactions);
+        },
+        BenchmarkCommand::Empty(opt) => {
+            let mut simulator = Simulator::with_account_nums(opt.num_accounts);
+            simulator.run_empty(opt.num_transactions);
+        },
     }
 }
 
