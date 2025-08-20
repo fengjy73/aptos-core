@@ -71,9 +71,87 @@ cd aptos-move/aptos-transaction-benchmarks
 
 ## 运行基准测试
 
-### 1. ERC20历史数据重放测试（推荐）
+### 1. 使用Scripts脚本运行（推荐）
 
-这是最常用的基准测试，使用真实的以太坊历史交易数据：
+项目提供了多个预配置的脚本，位于 `scripts/` 目录下，所有脚本已设置执行权限：
+
+```bash
+# 查看所有可用脚本
+ls -la scripts/
+
+# 主要的历史数据测试脚本（支持Block-STM Logger）
+./scripts/run_data_historical_log.sh
+
+# 其他可用脚本
+./scripts/run_benchmark_test.sh      # 完整基准测试
+./scripts/run_eth_historical.sh     # ETH历史数据测试  
+./scripts/run_airdrop.sh            # 空投测试
+./scripts/run_ballot.sh             # 投票测试
+./scripts/run_erc20_transfer.sh     # ERC20转账测试
+./scripts/run_kitty.sh              # Kitty NFT测试
+./scripts/run_million_pixel.sh      # Million Pixel测试
+```
+
+#### 使用 `run_data_historical_log.sh` 脚本（重点推荐）
+
+这是专门为Block-STM Logger设计的综合测试脚本：
+
+```bash
+# 默认运行（DEBUG级别日志，运行1次）
+./scripts/run_data_historical_log.sh
+
+# 自定义日志级别
+BLOCK_STM_LOG_LEVEL=INFO ./scripts/run_data_historical_log.sh
+
+# 设置多次运行以获得更稳定的结果
+NUM_RUNS=3 ./scripts/run_data_historical_log.sh
+
+# 组合配置
+BLOCK_STM_LOG_LEVEL=INFO NUM_RUNS=5 ./scripts/run_data_historical_log.sh
+```
+
+**脚本特性：**
+- 自动处理 `data_easy/` 目录下的所有CSV文件
+- 自动测试不同的CPU核心配置
+- 为每个测试创建独立的日志目录
+- 生成性能摘要和TPS分析
+- 支持环境变量配置
+
+#### 后台运行（使用nohup）
+
+对于长时间运行的测试，建议使用 `nohup` 在后台执行：
+
+```bash
+# 后台运行历史数据测试
+nohup ./scripts/run_data_historical_log.sh > nohup_test.out 2>&1 &
+
+# 查看运行状态
+tail -f nohup_test.out
+
+# 或者使用自定义输出文件名
+nohup ./scripts/run_data_historical_log.sh > historical_test_$(date +%Y%m%d_%H%M%S).out 2>&1 &
+
+# 后台运行时使用环境变量
+nohup bash -c 'BLOCK_STM_LOG_LEVEL=INFO NUM_RUNS=3 ./scripts/run_data_historical_log.sh' > test_output.log 2>&1 &
+
+# 查看后台进程
+ps aux | grep run_data_historical_log
+
+# 如果需要终止后台任务
+killall -9 run_data_historical_log.sh
+# 或通过进程ID
+kill -9 <process_id>
+```
+
+**nohup运行的优势：**
+- 测试不会因终端关闭而中断
+- 可以远程启动测试并断开连接
+- 输出自动重定向到文件，便于后续分析
+- 适合长时间的大规模基准测试
+
+### 2. 直接使用cargo命令运行
+
+如果需要更精确的控制，可以直接使用cargo命令：
 
 ```bash
 # 基本ERC20重放测试
@@ -89,7 +167,7 @@ cargo run --release -- replay-erc20 \
   --num-runs 1
 ```
 
-### 2. 不同并发级别测试
+### 3. 不同并发级别测试
 
 测试不同的并发级别以分析性能扩展性：
 
@@ -106,7 +184,7 @@ for cores in 2 4 8 16; do
 done
 ```
 
-### 3. 不同数据集测试
+### 4. 不同数据集测试
 
 测试不同大小的数据集：
 
@@ -130,22 +208,31 @@ cargo run --release -- replay-erc20 \
   --concurrency-level 4
 ```
 
-### 4. 其他基准测试类型
+### 5. 其他基准测试类型
+
+使用预配置脚本运行其他类型的测试：
 
 ```bash
 # 空投测试
+./scripts/run_airdrop.sh
+
+# 投票测试  
+./scripts/run_ballot.sh
+
+# ERC20转账测试
+./scripts/run_erc20_transfer.sh
+
+# NFT相关测试
+./scripts/run_kitty.sh
+./scripts/run_million_pixel.sh
+
+# 也可以直接使用cargo命令
 cargo run --release -- run-airdrop \
   --num-accounts 1000 \
   --concurrency-level 4
 
-# 投票测试
 cargo run --release -- run-voting \
   --num-voters 500 \
-  --concurrency-level 4
-
-# 代币交换测试
-cargo run --release -- run-token-swap \
-  --num-swaps 1000 \
   --concurrency-level 4
 ```
 
