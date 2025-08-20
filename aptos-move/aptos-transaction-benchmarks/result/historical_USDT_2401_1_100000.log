@@ -1,0 +1,218 @@
+run historical transfer tasks for USDT_2401_1_100000 with logging
+Data file: ./data_easy/USDT_2401_1_100000.csv
+Log level: DEBUG
+Number of runs: 1
+Block-STM logs directory: ./batch_logs/USDT_2401_1_100000
+
+============================== running with cpu cores: (0) count: 1 ==============================
+Block-STM logs for this run: ./batch_logs/USDT_2401_1_100000/cores_1
+2025-08-13T02:42:33.021587Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-08-13T02:42:33.021787Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-08-13T02:42:33.021846Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1755052353021&to=1755052953021&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1755052953021702000&var-kubernetes_pod_name=All&var-role=All 
+Creating Simulator with logging enabled, output dir: Some("./batch_logs/USDT_2401_1_100000/cores_1")
+Block-STM logger initialized with output dir: Some("./batch_logs/USDT_2401_1_100000/cores_1")
+Execution context set: dataset=USDT, source_csv=./data_easy/USDT_2401_1_100000.csv
+Reading ERC20 historic data from: ./data_easy/USDT_2401_1_100000.csv
+Loading CSV data from: ./data_easy/USDT_2401_1_100000.csv
+Generated row_tx_mapping.csv with 100000 entries at ./batch_logs/USDT_2401_1_100000/cores_1/block_000/row_tx_mapping.csv
+Generated code_map.json at ./batch_logs/USDT_2401_1_100000/cores_1/block_000/code_map.json
+Generated meta.json at ./batch_logs/USDT_2401_1_100000/cores_1/block_000/meta.json
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Block-STM logging enabled for block 0, 100000 transactions, concurrency level 1
+Benchmark run 1/1
+顺序执行开始...
+2025-08-13T02:42:46.245889Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2803 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+2025-08-13T02:43:09.042399Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":799812,"elapsed_ms":22778,"num_committed":100000,"num_total":100000,"num_workers":1,"raw_block_gas":799812}
+execution_total:100000, validation_total:0, abort:0, stall:0, avg_stall_time:0.00 us, stall_time_total:0.00 us
+执行次数:100000, 验证次数:0, 中止次数:0
+顺序执行完成，TPS = 4364
+Block-STM ERC20 historic replay end: block 0, 100000 transactions, concurrency 1
+ERC20 historic replay completed successfully
+
+
+============================== running with cpu cores: (0,1) count: 2 ==============================
+Block-STM logs for this run: ./batch_logs/USDT_2401_1_100000/cores_2
+2025-08-13T02:43:17.080871Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-08-13T02:43:17.081063Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-08-13T02:43:17.081121Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1755052397081&to=1755052997081&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1755052997080981000&var-kubernetes_pod_name=All&var-role=All 
+Creating Simulator with logging enabled, output dir: Some("./batch_logs/USDT_2401_1_100000/cores_2")
+Block-STM logger initialized with output dir: Some("./batch_logs/USDT_2401_1_100000/cores_2")
+Execution context set: dataset=USDT, source_csv=./data_easy/USDT_2401_1_100000.csv
+Reading ERC20 historic data from: ./data_easy/USDT_2401_1_100000.csv
+Loading CSV data from: ./data_easy/USDT_2401_1_100000.csv
+Generated row_tx_mapping.csv with 100000 entries at ./batch_logs/USDT_2401_1_100000/cores_2/block_000/row_tx_mapping.csv
+Generated code_map.json at ./batch_logs/USDT_2401_1_100000/cores_2/block_000/code_map.json
+Generated meta.json at ./batch_logs/USDT_2401_1_100000/cores_2/block_000/meta.json
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Block-STM logging enabled for block 0, 100000 transactions, concurrency level 2
+Benchmark run 1/1
+并行执行开始...
+Block-STM parallel execution start: block 0, 100000 transactions, concurrency 2
+2025-08-13T02:43:30.219114Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2803 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+Starting parallel execution with 2 workers for 100000 transactions
+Progress: Executing transaction 0 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 1)
+Progress: Executing transaction 20000 (incarnation 0)
+Progress: Executing transaction 30000 (incarnation 0)
+Progress: Executing transaction 40000 (incarnation 0)
+Progress: Executing transaction 50000 (incarnation 0)
+Progress: Executing transaction 60000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 1)
+Progress: Executing transaction 80000 (incarnation 0)
+Progress: Executing transaction 80000 (incarnation 1)
+Progress: Executing transaction 90000 (incarnation 0)
+2025-08-13T02:43:50.784641Z [par_exec-0] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[2] execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":799812,"elapsed_ms":20543,"num_committed":100000,"num_total":100000,"num_workers":2,"raw_block_gas":799812}
+Block-STM parallel execution end: block 0, 100000 transactions, successful: 100000, failed: 0
+执行次数:123830, 验证次数:347660, 中止次数:23830, 停滞次数:17, 平均停滞时间:139.71 us, 总停滞时间:2375.00 us
+并行执行完成，TPS = 4852
+Block-STM ERC20 historic replay end: block 0, 100000 transactions, concurrency 2
+ERC20 historic replay completed successfully
+
+
+============================== running with cpu cores: (0,1,2,3) count: 4 ==============================
+Block-STM logs for this run: ./batch_logs/USDT_2401_1_100000/cores_4
+2025-08-13T02:43:59.001977Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-08-13T02:43:59.002180Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-08-13T02:43:59.002239Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1755052439002&to=1755053039002&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1755053039002092000&var-kubernetes_pod_name=All&var-role=All 
+Creating Simulator with logging enabled, output dir: Some("./batch_logs/USDT_2401_1_100000/cores_4")
+Block-STM logger initialized with output dir: Some("./batch_logs/USDT_2401_1_100000/cores_4")
+Execution context set: dataset=USDT, source_csv=./data_easy/USDT_2401_1_100000.csv
+Reading ERC20 historic data from: ./data_easy/USDT_2401_1_100000.csv
+Loading CSV data from: ./data_easy/USDT_2401_1_100000.csv
+Generated row_tx_mapping.csv with 100000 entries at ./batch_logs/USDT_2401_1_100000/cores_4/block_000/row_tx_mapping.csv
+Generated code_map.json at ./batch_logs/USDT_2401_1_100000/cores_4/block_000/code_map.json
+Generated meta.json at ./batch_logs/USDT_2401_1_100000/cores_4/block_000/meta.json
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Block-STM logging enabled for block 0, 100000 transactions, concurrency level 4
+Benchmark run 1/1
+并行执行开始...
+Block-STM parallel execution start: block 0, 100000 transactions, concurrency 4
+2025-08-13T02:44:11.720759Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2803 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+Starting parallel execution with 4 workers for 100000 transactions
+Progress: Executing transaction 0 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 1)
+Progress: Executing transaction 10000 (incarnation 2)
+Progress: Executing transaction 10000 (incarnation 3)
+Progress: Executing transaction 10000 (incarnation 4)
+Progress: Executing transaction 10000 (incarnation 5)
+Progress: Executing transaction 20000 (incarnation 0)
+Progress: Executing transaction 30000 (incarnation 0)
+Progress: Executing transaction 40000 (incarnation 0)
+Progress: Executing transaction 50000 (incarnation 0)
+Progress: Executing transaction 60000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 1)
+Progress: Executing transaction 80000 (incarnation 0)
+Progress: Executing transaction 90000 (incarnation 0)
+2025-08-13T02:44:30.444843Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[4] execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":799812,"elapsed_ms":18701,"num_committed":100000,"num_total":100000,"num_workers":4,"raw_block_gas":799812}
+Block-STM parallel execution end: block 0, 100000 transactions, successful: 100000, failed: 0
+执行次数:143391, 验证次数:386782, 中止次数:43391, 停滞次数:6194, 平均停滞时间:2860.10 us, 总停滞时间:17715452.00 us
+并行执行完成，TPS = 5328
+Block-STM ERC20 historic replay end: block 0, 100000 transactions, concurrency 4
+ERC20 historic replay completed successfully
+
+
+============================== running with cpu cores: (0,1,2,3,4,5,6,7) count: 8 ==============================
+Block-STM logs for this run: ./batch_logs/USDT_2401_1_100000/cores_8
+2025-08-13T02:44:38.643214Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-08-13T02:44:38.643454Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-08-13T02:44:38.643522Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1755052478643&to=1755053078643&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1755053078643341000&var-kubernetes_pod_name=All&var-role=All 
+Creating Simulator with logging enabled, output dir: Some("./batch_logs/USDT_2401_1_100000/cores_8")
+Block-STM logger initialized with output dir: Some("./batch_logs/USDT_2401_1_100000/cores_8")
+Execution context set: dataset=USDT, source_csv=./data_easy/USDT_2401_1_100000.csv
+Reading ERC20 historic data from: ./data_easy/USDT_2401_1_100000.csv
+Loading CSV data from: ./data_easy/USDT_2401_1_100000.csv
+Generated row_tx_mapping.csv with 100000 entries at ./batch_logs/USDT_2401_1_100000/cores_8/block_000/row_tx_mapping.csv
+Generated code_map.json at ./batch_logs/USDT_2401_1_100000/cores_8/block_000/code_map.json
+Generated meta.json at ./batch_logs/USDT_2401_1_100000/cores_8/block_000/meta.json
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Block-STM logging enabled for block 0, 100000 transactions, concurrency level 8
+Benchmark run 1/1
+并行执行开始...
+Block-STM parallel execution start: block 0, 100000 transactions, concurrency 8
+2025-08-13T02:44:51.370012Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2803 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+Starting parallel execution with 8 workers for 100000 transactions
+Progress: Executing transaction 0 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 1)
+Progress: Executing transaction 10000 (incarnation 2)
+Progress: Executing transaction 10000 (incarnation 3)
+Progress: Executing transaction 10000 (incarnation 4)
+Progress: Executing transaction 20000 (incarnation 0)
+Progress: Executing transaction 30000 (incarnation 0)
+Progress: Executing transaction 40000 (incarnation 0)
+Progress: Executing transaction 50000 (incarnation 0)
+Progress: Executing transaction 60000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 1)
+Progress: Executing transaction 80000 (incarnation 0)
+Progress: Executing transaction 80000 (incarnation 1)
+Progress: Executing transaction 90000 (incarnation 0)
+Progress: Executing transaction 90000 (incarnation 1)
+2025-08-13T02:45:12.557969Z [par_exec-1] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[8] execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":799812,"elapsed_ms":21165,"num_committed":100000,"num_total":100000,"num_workers":8,"raw_block_gas":799812}
+Block-STM parallel execution end: block 0, 100000 transactions, successful: 100000, failed: 0
+执行次数:162755, 验证次数:425510, 中止次数:62755, 停滞次数:12119, 平均停滞时间:11236.23 us, 总停滞时间:136171850.00 us
+并行执行完成，TPS = 4709
+Block-STM ERC20 historic replay end: block 0, 100000 transactions, concurrency 8
+ERC20 historic replay completed successfully
+
+
+============================== running with cpu cores: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15) count: 16 ==============================
+Block-STM logs for this run: ./batch_logs/USDT_2401_1_100000/cores_16
+2025-08-13T02:45:20.899638Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-08-13T02:45:20.899829Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-08-13T02:45:20.899885Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1755052520899&to=1755053120899&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1755053120899749000&var-kubernetes_pod_name=All&var-role=All 
+Creating Simulator with logging enabled, output dir: Some("./batch_logs/USDT_2401_1_100000/cores_16")
+Block-STM logger initialized with output dir: Some("./batch_logs/USDT_2401_1_100000/cores_16")
+Execution context set: dataset=USDT, source_csv=./data_easy/USDT_2401_1_100000.csv
+Reading ERC20 historic data from: ./data_easy/USDT_2401_1_100000.csv
+Loading CSV data from: ./data_easy/USDT_2401_1_100000.csv
+Generated row_tx_mapping.csv with 100000 entries at ./batch_logs/USDT_2401_1_100000/cores_16/block_000/row_tx_mapping.csv
+Generated code_map.json at ./batch_logs/USDT_2401_1_100000/cores_16/block_000/code_map.json
+Generated meta.json at ./batch_logs/USDT_2401_1_100000/cores_16/block_000/meta.json
+Loaded 100000 transactions from CSV
+Generated 100000 signature verified transactions
+Block-STM logging enabled for block 0, 100000 transactions, concurrency level 16
+Benchmark run 1/1
+并行执行开始...
+Block-STM parallel execution start: block 0, 100000 transactions, concurrency 16
+2025-08-13T02:45:33.754062Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2803 Executing block, transaction count: 100000 {"name":"miscellaneous","txn_idx":0}
+Starting parallel execution with 16 workers for 100000 transactions
+Progress: Executing transaction 0 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 0)
+Progress: Executing transaction 10000 (incarnation 1)
+Progress: Executing transaction 10000 (incarnation 2)
+Progress: Executing transaction 10000 (incarnation 3)
+Progress: Executing transaction 10000 (incarnation 4)
+Progress: Executing transaction 10000 (incarnation 5)
+Progress: Executing transaction 20000 (incarnation 0)
+Progress: Executing transaction 30000 (incarnation 0)
+Progress: Executing transaction 40000 (incarnation 0)
+Progress: Executing transaction 50000 (incarnation 0)
+Progress: Executing transaction 60000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 0)
+Progress: Executing transaction 70000 (incarnation 1)
+Progress: Executing transaction 70000 (incarnation 2)
+Progress: Executing transaction 80000 (incarnation 0)
+Progress: Executing transaction 80000 (incarnation 1)
+Progress: Executing transaction 90000 (incarnation 0)
+Progress: Executing transaction 90000 (incarnation 1)
+2025-08-13T02:46:00.573116Z [par_exec-15] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[16] execution completed. 100000 out of 100000 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":799812,"elapsed_ms":26793,"num_committed":100000,"num_total":100000,"num_workers":16,"raw_block_gas":799812}
+Block-STM parallel execution end: block 0, 100000 transactions, successful: 100000, failed: 0
+执行次数:185065, 验证次数:470130, 中止次数:85065, 停滞次数:23786, 平均停滞时间:41425.57 us, 总停滞时间:985348692.00 us
+并行执行完成，TPS = 3722
+Block-STM ERC20 historic replay end: block 0, 100000 transactions, concurrency 16
+ERC20 historic replay completed successfully
+
+
+============================== finalize ==============================
+parallel execution tps: []
+speed up: []
+sequential execution tps: []
