@@ -1,0 +1,225 @@
+Block-STM 历史转账重放综合测试 - basic 场景
+原始数据文件: ./data/ETH_2401_100000.csv
+采样数据文件: ./temp_data/ETH_2401_100000_100.csv
+交易数量: 100
+测试场景: basic
+日志级别: INFO
+开始时间: Fri Jul 25 12:51:42 CST 2025
+
+============================== 运行 CPU 核心: (0) 数量:        1, 交易数: 100 ==============================
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/aptos-move/aptos-transaction-benchmarks/Cargo.toml
+workspace: /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/Cargo.toml
+warning: field `start_time` is never read
+   --> aptos-move/block-executor/src/block_stm_logger.rs:187:5
+    |
+184 | pub struct BlockSTMLogger {
+    |            -------------- field in this struct
+...
+187 |     start_time: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `aptos-block-executor` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.10s
+     Running `/Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/target/release/aptos-transaction-benchmarks replay-erc20 --data-path ./temp_data/ETH_2401_100000_100.csv --concurrency-level 1`
+2025-07-25T04:51:44.238300Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-25T04:51:44.238459Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-25T04:51:44.238518Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1753418504238&to=1753419104238&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1753419104238379000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-25T04:51:48.662519Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:51:48.716201Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":30,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 1886
+Sequential execution starts...
+2025-07-25T04:51:48.717672Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:51:48.768466Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":28,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 2000
+
+=== Block-STM 详细日志分析 (交易数: 100, 核心数:        1) ===
+日志文件摘要:
+=== Block-STM 日志分析结束 ===
+
+============================== 运行 CPU 核心: (0,1) 数量:        2, 交易数: 100 ==============================
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/aptos-move/aptos-transaction-benchmarks/Cargo.toml
+workspace: /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/Cargo.toml
+warning: field `start_time` is never read
+   --> aptos-move/block-executor/src/block_stm_logger.rs:187:5
+    |
+184 | pub struct BlockSTMLogger {
+    |            -------------- field in this struct
+...
+187 |     start_time: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `aptos-block-executor` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.91s
+     Running `/Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/target/release/aptos-transaction-benchmarks replay-erc20 --data-path ./temp_data/ETH_2401_100000_100.csv --concurrency-level 2`
+2025-07-25T04:51:54.518987Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-25T04:51:54.519151Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-25T04:51:54.519214Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1753418514519&to=1753419114519&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1753419114519070000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-25T04:51:58.889579Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:51:58.930615Z [par_exec-1] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[2] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":16,"num_committed":100,"num_total":100,"num_workers":2,"raw_block_gas":798}
+execution_total:100, validation_total:200, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:200, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 2439
+Sequential execution starts...
+2025-07-25T04:51:58.932943Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:51:58.982882Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":28,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 2000
+
+=== Block-STM 详细日志分析 (交易数: 100, 核心数:        2) ===
+日志文件摘要:
+=== Block-STM 日志分析结束 ===
+
+============================== 运行 CPU 核心: (0,1,2,3) 数量:        4, 交易数: 100 ==============================
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/aptos-move/aptos-transaction-benchmarks/Cargo.toml
+workspace: /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/Cargo.toml
+warning: field `start_time` is never read
+   --> aptos-move/block-executor/src/block_stm_logger.rs:187:5
+    |
+184 | pub struct BlockSTMLogger {
+    |            -------------- field in this struct
+...
+187 |     start_time: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `aptos-block-executor` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.14s
+     Running `/Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/target/release/aptos-transaction-benchmarks replay-erc20 --data-path ./temp_data/ETH_2401_100000_100.csv --concurrency-level 4`
+2025-07-25T04:52:03.968715Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-25T04:52:03.968895Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-25T04:52:03.968971Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1753418523968&to=1753419123968&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1753419123968797000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-25T04:52:08.322591Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:08.356623Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[4] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":11,"num_committed":100,"num_total":100,"num_workers":4,"raw_block_gas":798}
+execution_total:102, validation_total:203, abort:2, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:102, validation_total:203, abort:2, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 2941
+Sequential execution starts...
+2025-07-25T04:52:08.358745Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:08.410008Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":28,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1960
+
+=== Block-STM 详细日志分析 (交易数: 100, 核心数:        4) ===
+日志文件摘要:
+=== Block-STM 日志分析结束 ===
+
+============================== 运行 CPU 核心: (0,1,2,3,4,5,6,7) 数量:        8, 交易数: 100 ==============================
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/aptos-move/aptos-transaction-benchmarks/Cargo.toml
+workspace: /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/Cargo.toml
+warning: field `start_time` is never read
+   --> aptos-move/block-executor/src/block_stm_logger.rs:187:5
+    |
+184 | pub struct BlockSTMLogger {
+    |            -------------- field in this struct
+...
+187 |     start_time: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `aptos-block-executor` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.99s
+     Running `/Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/target/release/aptos-transaction-benchmarks replay-erc20 --data-path ./temp_data/ETH_2401_100000_100.csv --concurrency-level 8`
+2025-07-25T04:52:14.273174Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-25T04:52:14.273321Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-25T04:52:14.273380Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1753418534273&to=1753419134273&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1753419134273247000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-25T04:52:18.621977Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:18.653126Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[8] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":7,"num_committed":100,"num_total":100,"num_workers":8,"raw_block_gas":798}
+execution_total:103, validation_total:204, abort:3, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:103, validation_total:204, abort:3, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Parallel execution finishes, TPS = 3225
+Sequential execution starts...
+2025-07-25T04:52:18.654842Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:18.706217Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":29,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1960
+
+=== Block-STM 详细日志分析 (交易数: 100, 核心数:        8) ===
+日志文件摘要:
+=== Block-STM 日志分析结束 ===
+
+============================== 运行 CPU 核心: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15) 数量:       16, 交易数: 100 ==============================
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/aptos-move/aptos-transaction-benchmarks/Cargo.toml
+workspace: /Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/Cargo.toml
+warning: field `start_time` is never read
+   --> aptos-move/block-executor/src/block_stm_logger.rs:187:5
+    |
+184 | pub struct BlockSTMLogger {
+    |            -------------- field in this struct
+...
+187 |     start_time: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `aptos-block-executor` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.12s
+     Running `/Users/bethestar/Downloads/Crystality/BCParallelConcurrencyEvaluation/aptos-core/target/release/aptos-transaction-benchmarks replay-erc20 --data-path ./temp_data/ETH_2401_100000_100.csv --concurrency-level 16`
+2025-07-25T04:52:23.686331Z [main] WARN crates/node-resource-metrics/src/lib.rs:48 Failed to register collector: Duplicate metrics collector registration attempted
+2025-07-25T04:52:23.686479Z [main] INFO crates/aptos-push-metrics/src/lib.rs:99 PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.
+2025-07-25T04:52:23.686533Z [main] INFO crates/aptos-push-metrics/src/lib.rs:194 Execution dashboard link: https://aptoslabs.grafana.net/d/execution/execution?from=1753418543686&to=1753419143686&var-Datasource=fHo-R604z&var-metrics_source=All&var-chain_name=block-stm-benchmark&var-cluster=All&var-namespace=1753419143686402000&var-kubernetes_pod_name=All&var-role=All 
+Reading ERC20 historic data from: ./temp_data/ETH_2401_100000_100.csv
+Loaded 100 transactions from CSV
+Generated 100 signature verified transactions
+Benchmark run 1/1
+Parallel execution starts...
+2025-07-25T04:52:28.029657Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:28.060156Z [par_exec-14] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Parallel[16] execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":7,"num_committed":100,"num_total":100,"num_workers":16,"raw_block_gas":798}
+execution_total:105, validation_total:222, abort:5, suspend:1, avg_suspend_time:131.92 us, suspend_time_total:131.92 us
+execution_total:105, validation_total:222, abort:5, suspend:1, avg_suspend_time:131.92 us, suspend_time_total:131.92 us
+Parallel execution finishes, TPS = 3333
+Sequential execution starts...
+2025-07-25T04:52:28.061817Z [main] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2772 Executing block, transaction count: 100 {"name":"miscellaneous","txn_idx":0}
+2025-07-25T04:52:28.112505Z [main] INFO aptos-move/block-executor/src/limit_processor.rs:230 [BlockSTM]: Sequential execution completed. 100 out of 100 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_gas_limit_override":0,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":798,"elapsed_ms":29,"num_committed":100,"num_total":100,"num_workers":1,"raw_block_gas":798}
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+execution_total:100, validation_total:0, abort:0, suspend:0, avg_suspend_time:0.00 us, suspend_time_total:0.00 us
+Sequential execution finishes, TPS = 1960
+
+=== Block-STM 详细日志分析 (交易数: 100, 核心数:       16) ===
+日志文件摘要:
+=== Block-STM 日志分析结束 ===
+
+============================== 完成 ==============================
+
+=== 性能摘要 ===
+并行执行 TPS: [1886,2439,2941,3225,3333]
+加速比: [1.00,1.29,1.55,1.70,1.76]
+顺序执行 TPS: [2000,2000,1960,1960,1960]
+结束时间: Fri Jul 25 12:52:31 CST 2025
